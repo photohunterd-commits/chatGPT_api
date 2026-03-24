@@ -10,7 +10,7 @@ public sealed class ConnectionSettingsStore
 {
     private sealed class StoredSettings
     {
-        public string BaseUrl { get; set; } = "http://127.0.0.1:3030";
+        public string BaseUrl { get; set; } = ConnectionSettings.DefaultBaseUrl;
 
         public string AuthToken { get; set; } = string.Empty;
 
@@ -41,10 +41,15 @@ public sealed class ConnectionSettingsStore
         await using var stream = File.OpenRead(_settingsPath);
         var stored = await JsonSerializer.DeserializeAsync<StoredSettings>(stream, SerializerOptions)
             ?? new StoredSettings();
+        var baseUrl = string.IsNullOrWhiteSpace(stored.BaseUrl)
+            || string.Equals(stored.BaseUrl, "http://127.0.0.1:3030", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(stored.BaseUrl, "http://localhost:3030", StringComparison.OrdinalIgnoreCase)
+                ? ConnectionSettings.DefaultBaseUrl
+                : stored.BaseUrl;
 
         return new ConnectionSettings
         {
-            BaseUrl = stored.BaseUrl,
+            BaseUrl = baseUrl,
             AuthToken = Unprotect(stored.AuthToken),
             ProviderApiKey = Unprotect(stored.ProviderApiKey),
             UserEmail = stored.UserEmail,

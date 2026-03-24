@@ -90,6 +90,13 @@ public sealed class MeResponse
     public UserDto User { get; set; } = new();
 }
 
+public sealed class OperationStatusResponse
+{
+    public string Message { get; set; } = string.Empty;
+
+    public UserDto? User { get; set; }
+}
+
 public sealed class CreateProjectRequest
 {
     public string Name { get; set; } = string.Empty;

@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using ChatGptApi.Desktop.Dialogs;
 using ChatGptApi.Desktop.Services;
@@ -20,12 +21,11 @@ public partial class MainWindow : Window
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         await RunSafeAsync(_viewModel.InitializeAsync);
-        ProviderApiKeyBox.Password = _viewModel.ProviderApiKey;
     }
 
-    private async void OnSaveSettingsClick(object sender, RoutedEventArgs e)
+    private async void OnSettingsClick(object sender, RoutedEventArgs e)
     {
-        await RunSafeAsync(_viewModel.SaveSettingsAsync);
+        await OpenSettingsAsync();
     }
 
     private async void OnRefreshClick(object sender, RoutedEventArgs e)
@@ -35,27 +35,37 @@ public partial class MainWindow : Window
 
     private async void OnRegisterClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new AuthDialog(isRegistration: true)
+        var dialog = new AuthDialog(_viewModel, isRegistration: true)
         {
             Owner = this
         };
 
         if (dialog.ShowDialog() == true)
         {
-            await RunSafeAsync(() => _viewModel.RegisterAsync(dialog.DisplayName, dialog.Email, dialog.Password));
+            var succeeded = await RunSafeAsync(() => _viewModel.RegisterAsync(dialog.DisplayName, dialog.Email, dialog.Password));
+
+            if (succeeded)
+            {
+                await PromptForProviderKeyIfMissingAsync();
+            }
         }
     }
 
     private async void OnLoginClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new AuthDialog(isRegistration: false)
+        var dialog = new AuthDialog(_viewModel, isRegistration: false)
         {
             Owner = this
         };
 
         if (dialog.ShowDialog() == true)
         {
-            await RunSafeAsync(() => _viewModel.LoginAsync(dialog.Email, dialog.Password));
+            var succeeded = await RunSafeAsync(() => _viewModel.LoginAsync(dialog.Email, dialog.Password));
+
+            if (succeeded)
+            {
+                await PromptForProviderKeyIfMissingAsync();
+            }
         }
     }
 
@@ -64,12 +74,20 @@ public partial class MainWindow : Window
         await RunSafeAsync(_viewModel.LogoutAsync);
     }
 
-    private void OnProviderApiKeyChanged(object sender, RoutedEventArgs e)
+    private async void OnChangePasswordClick(object sender, RoutedEventArgs e)
     {
-        _viewModel.ProviderApiKey = ProviderApiKeyBox.Password;
+        var dialog = new ChangePasswordDialog
+        {
+            Owner = this
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            await RunSafeAsync(() => _viewModel.ChangePasswordAsync(dialog.CurrentPassword, dialog.NewPassword));
+        }
     }
 
-    private async void OnProjectSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private async void OnProjectSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!IsLoaded)
         {
@@ -79,7 +97,7 @@ public partial class MainWindow : Window
         await RunSafeAsync(() => _viewModel.LoadChatsForSelectedProjectAsync());
     }
 
-    private async void OnChatSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private async void OnChatSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!IsLoaded)
         {
@@ -129,17 +147,43 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task RunSafeAsync(Func<Task> action)
+    private async Task PromptForProviderKeyIfMissingAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_viewModel.ProviderApiKey))
+        {
+            return;
+        }
+
+        await OpenSettingsAsync();
+    }
+
+    private async Task OpenSettingsAsync()
+    {
+        var dialog = new SettingsDialog(_viewModel.ProviderApiKey)
+        {
+            Owner = this
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            _viewModel.ProviderApiKey = dialog.ProviderApiKey;
+            await RunSafeAsync(_viewModel.SaveSettingsAsync);
+        }
+    }
+
+    private async Task<bool> RunSafeAsync(Func<Task> action)
     {
         try
         {
             _viewModel.IsBusy = true;
             await action();
+            return true;
         }
         catch (Exception exception)
         {
             _viewModel.StatusMessage = exception.Message;
             MessageBox.Show(this, exception.Message, GetErrorCaption(exception.Message), MessageBoxButton.OK, GetErrorIcon(exception.Message));
+            return false;
         }
         finally
         {

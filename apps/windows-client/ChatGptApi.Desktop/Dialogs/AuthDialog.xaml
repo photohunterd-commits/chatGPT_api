@@ -2,90 +2,128 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Account"
-        Width="460"
-        Height="320"
+        Width="520"
+        SizeToContent="Height"
+        MinHeight="420"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="#F6F2EA">
-    <Grid Margin="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+        ShowInTaskbar="False"
+        Loaded="OnLoaded">
+    <Border Margin="0"
+            Padding="26"
+            Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-        <TextBlock x:Name="HeaderTextBlock"
-                   FontSize="24"
-                   FontWeight="SemiBold"
-                   Foreground="#153A29"
-                   Text="Sign In" />
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="46"
+                                Height="46"
+                                Background="{StaticResource AccentMutedBrush}"
+                                CornerRadius="15">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Style="{StaticResource IconTextStyle}"
+                                           FontSize="22"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           Text="&#xE77B;" />
+                            </Viewbox>
+                        </Border>
 
-        <StackPanel x:Name="NamePanel"
-                    Grid.Row="1"
-                    Margin="0,18,0,0">
-            <TextBlock Text="Name"
-                       FontWeight="SemiBold"
-                       Foreground="#153A29" />
-            <TextBox x:Name="NameTextBox"
-                     Margin="0,8,0,0"
-                     Height="38"
-                     Padding="10,8"
-                     Background="White"
-                     BorderBrush="#CDA778" />
-        </StackPanel>
+                        <StackPanel Margin="14,0,0,0"
+                                    VerticalAlignment="Center">
+                            <TextBlock x:Name="HeaderTextBlock"
+                                       FontSize="26"
+                                       FontWeight="SemiBold"
+                                       Text="Sign In" />
+                            <TextBlock x:Name="HintTextBlock"
+                                       Margin="0,6,0,0"
+                                       Foreground="{StaticResource SubtleTextBrush}"
+                                       Text="Sign in to continue with your private projects and chats." />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
 
-        <StackPanel Grid.Row="2"
-                    Margin="0,18,0,0">
-            <TextBlock Text="Email"
-                       FontWeight="SemiBold"
-                       Foreground="#153A29" />
-            <TextBox x:Name="EmailTextBox"
-                     Margin="0,8,0,0"
-                     Height="38"
-                     Padding="10,8"
-                     Background="White"
-                     BorderBrush="#CDA778" />
-        </StackPanel>
+                <StackPanel x:Name="NamePanel"
+                            Grid.Row="1"
+                            Margin="0,22,0,0">
+                    <TextBlock FontWeight="SemiBold"
+                               Text="Name" />
+                    <TextBox x:Name="NameTextBox"
+                             Margin="0,10,0,0"
+                             Height="42" />
+                </StackPanel>
 
-        <StackPanel Grid.Row="3"
-                    Margin="0,18,0,0">
-            <TextBlock Text="Password"
-                       FontWeight="SemiBold"
-                       Foreground="#153A29" />
-            <PasswordBox x:Name="PasswordBox"
-                         Margin="0,8,0,0"
-                         Height="38"
-                         Padding="10,8"
-                         Background="White"
-                         BorderBrush="#CDA778" />
-        </StackPanel>
+                <StackPanel Grid.Row="2"
+                            Margin="0,18,0,0">
+                    <TextBlock FontWeight="SemiBold"
+                               Text="Email" />
+                    <TextBox x:Name="EmailTextBox"
+                             Margin="0,10,0,0"
+                             Height="42" />
+                </StackPanel>
 
-        <TextBlock x:Name="HintTextBlock"
-                   Grid.Row="4"
-                   Margin="0,18,0,0"
-                   Foreground="#6A6257"
-                   Text="Use a private account so projects and chats stay visible only to you." />
+                <StackPanel Grid.Row="3"
+                            Margin="0,18,0,0">
+                    <TextBlock FontWeight="SemiBold"
+                               Text="Password" />
+                    <PasswordBox x:Name="PasswordBox"
+                                 Margin="0,10,0,0"
+                                 Height="42" />
+                </StackPanel>
 
-        <StackPanel Grid.Row="5"
-                    Margin="0,24,0,0"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right">
-            <Button Width="100"
-                    Height="38"
-                    Margin="0,0,12,0"
-                    Click="OnCancelClick"
-                    Content="Cancel" />
-            <Button x:Name="SubmitButton"
-                    Width="120"
-                    Height="38"
-                    Background="#153A29"
-                    Foreground="White"
-                    BorderBrush="#153A29"
-                    Click="OnSubmitClick"
-                    Content="Sign In" />
-        </StackPanel>
-    </Grid>
+                <Border Grid.Row="4"
+                        Margin="0,18,0,0"
+                        Padding="14"
+                        Background="{StaticResource PanelAltBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="16">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource IconTextStyle}"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   Text="&#xE946;" />
+                        <TextBlock Margin="10,0,0,0"
+                                   Foreground="{StaticResource SubtleTextBrush}"
+                                   Text="The model API key is configured in Settings after this step, so you only need your account details here." />
+                    </StackPanel>
+                </Border>
+
+                <DockPanel Grid.Row="5"
+                           Margin="0,24,0,0"
+                           LastChildFill="False">
+                    <Button x:Name="ForgotPasswordButton"
+                            Width="140"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Click="OnForgotPasswordClick"
+                            Content="Forgot Password" />
+                    <StackPanel DockPanel.Dock="Right"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button Width="110"
+                                Margin="0,0,12,0"
+                                Style="{StaticResource GhostButtonStyle}"
+                                IsCancel="True"
+                                Click="OnCancelClick"
+                                Content="Cancel" />
+                        <Button x:Name="SubmitButton"
+                                Width="150"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                IsDefault="True"
+                                Click="OnSubmitClick"
+                                Content="Sign In" />
+                    </StackPanel>
+                </DockPanel>
+            </Grid>
+        </ScrollViewer>
+    </Border>
 </Window>

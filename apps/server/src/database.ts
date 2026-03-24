@@ -18,6 +18,15 @@ interface UserRow extends PublicUser {
   passwordHash: string;
 }
 
+interface PasswordResetTokenRow {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  usedAt: string | null;
+  createdAt: string;
+}
+
 export interface ProjectRecord {
   id: string;
   userId: string;
@@ -111,10 +120,21 @@ export class AppDatabase {
         created_at TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash TEXT NOT NULL UNIQUE,
+        expires_at TEXT NOT NULL,
+        used_at TEXT,
+        created_at TEXT NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
       CREATE INDEX IF NOT EXISTS idx_chats_project_id ON chats(project_id);
       CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
       CREATE INDEX IF NOT EXISTS idx_messages_chat_created_at ON messages(chat_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+      CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
     `);
 
     const projectColumns = this.db.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
@@ -168,6 +188,26 @@ export class AppDatabase {
     return row ?? null;
   }
 
+  getUserCredentials(userId: string): UserRow | null {
+    const row = this.db
+      .prepare(
+        `
+        SELECT
+          id,
+          name,
+          email,
+          password_hash AS passwordHash,
+          created_at AS createdAt,
+          updated_at AS updatedAt
+        FROM users
+        WHERE id = ?
+      `
+      )
+      .get(userId) as UserRow | undefined;
+
+    return row ?? null;
+  }
+
   getUser(userId: string): PublicUser | null {
     const row = this.db
       .prepare(
@@ -185,6 +225,100 @@ export class AppDatabase {
       .get(userId) as PublicUser | undefined;
 
     return row ?? null;
+  }
+
+  updateUserPassword(userId: string, passwordHash: string) {
+    const now = new Date().toISOString();
+
+    this.db
+      .prepare(
+        `
+        UPDATE users
+        SET password_hash = ?, updated_at = ?
+        WHERE id = ?
+      `
+      )
+      .run(passwordHash, now, userId);
+
+    return this.getUser(userId);
+  }
+
+  createPasswordResetToken(input: { expiresAt: string; tokenHash: string; userId: string }) {
+    const token: PasswordResetTokenRow = {
+      id: randomUUID(),
+      userId: input.userId,
+      tokenHash: input.tokenHash,
+      expiresAt: input.expiresAt,
+      usedAt: null,
+      createdAt: new Date().toISOString()
+    };
+
+    this.db
+      .prepare(
+        `
+        INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at, used_at, created_at)
+        VALUES (@id, @userId, @tokenHash, @expiresAt, @usedAt, @createdAt)
+      `
+      )
+      .run(token);
+
+    return token;
+  }
+
+  findPasswordResetToken(tokenHash: string) {
+    const row = this.db
+      .prepare(
+        `
+        SELECT
+          id,
+          user_id AS userId,
+          token_hash AS tokenHash,
+          expires_at AS expiresAt,
+          used_at AS usedAt,
+          created_at AS createdAt
+        FROM password_reset_tokens
+        WHERE token_hash = ?
+      `
+      )
+      .get(tokenHash) as PasswordResetTokenRow | undefined;
+
+    if (!row) {
+      return null;
+    }
+
+    if (row.usedAt) {
+      return null;
+    }
+
+    if (new Date(row.expiresAt).getTime() <= Date.now()) {
+      return null;
+    }
+
+    return row;
+  }
+
+  markPasswordResetTokenUsed(tokenId: string) {
+    this.db
+      .prepare(
+        `
+        UPDATE password_reset_tokens
+        SET used_at = ?
+        WHERE id = ?
+      `
+      )
+      .run(new Date().toISOString(), tokenId);
+  }
+
+  invalidatePasswordResetTokensForUser(userId: string) {
+    this.db
+      .prepare(
+        `
+        UPDATE password_reset_tokens
+        SET used_at = COALESCE(used_at, ?)
+        WHERE user_id = ?
+      `
+      )
+      .run(new Date().toISOString(), userId);
   }
 
   listProjects(userId: string): ProjectSummary[] {

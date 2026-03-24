@@ -14,7 +14,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly ConnectionSettingsStore _settingsStore;
 
     private string _authToken = string.Empty;
-    private string _baseUrl = "http://62.109.2.121:3030";
+    private string _baseUrl = ConnectionSettings.DefaultBaseUrl;
     private string _currentUserEmail = string.Empty;
     private string _currentUserName = string.Empty;
     private string _draftMessage = string.Empty;
@@ -22,7 +22,7 @@ public sealed class MainViewModel : ObservableObject
     private string _providerApiKey = string.Empty;
     private ChatItem? _selectedChat;
     private ProjectItem? _selectedProject;
-    private string _statusMessage = "Register or sign in to load your private projects and chats.";
+    private string _statusMessage = "Create an account or sign in, then add your model key in Settings.";
 
     public MainViewModel(ChatApiClient apiClient, ConnectionSettingsStore settingsStore)
     {
@@ -45,7 +45,14 @@ public sealed class MainViewModel : ObservableObject
     public string ProviderApiKey
     {
         get => _providerApiKey;
-        set => SetProperty(ref _providerApiKey, value);
+        set
+        {
+            if (SetProperty(ref _providerApiKey, value))
+            {
+                OnPropertyChanged(nameof(HasProviderApiKey));
+                OnPropertyChanged(nameof(ProviderKeyStatusText));
+            }
+        }
     }
 
     public string DraftMessage
@@ -85,17 +92,25 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    public string SelectedChatTitle => SelectedChat?.Title ?? "Pick a chat to start talking";
+    public string SelectedChatTitle => SelectedChat?.Title ?? "Select a chat to start talking";
 
     public string SelectedChatSubtitle => SelectedChat is null
-        ? "Projects and chats are private per signed-in user."
+        ? "Projects and chats stay private for the signed-in user."
         : $"{SelectedChat.Model} / {SelectedChat.ReasoningEffort}";
+
+    public bool HasProviderApiKey => !string.IsNullOrWhiteSpace(_providerApiKey);
+
+    public string ProviderKeyStatusText => HasProviderApiKey
+        ? "Model API key is saved in Settings on this Windows profile."
+        : "Open Settings to add your model API key before sending messages.";
 
     public bool IsAuthenticated => !string.IsNullOrWhiteSpace(_authToken);
 
+    public bool IsSignedOut => !IsAuthenticated;
+
     public string CurrentUserStatusText => IsAuthenticated
         ? $"Signed in as {_currentUserName} ({_currentUserEmail})"
-        : "Not signed in";
+        : "Not signed in yet";
 
     public async Task InitializeAsync()
     {
@@ -116,7 +131,9 @@ public sealed class MainViewModel : ObservableObject
     public async Task SaveSettingsAsync()
     {
         await PersistSettingsAsync();
-        StatusMessage = "Connection settings saved on this Windows profile.";
+        StatusMessage = HasProviderApiKey
+            ? "Settings saved on this Windows profile."
+            : "Settings saved. Add your model key before sending messages.";
 
         if (IsAuthenticated)
         {
@@ -134,7 +151,9 @@ public sealed class MainViewModel : ObservableObject
         }, name, email, password);
 
         await ApplyAuthResponseAsync(response);
-        StatusMessage = $"Welcome, {response.User.Name}. Your private workspace is ready.";
+        StatusMessage = HasProviderApiKey
+            ? $"Welcome, {response.User.Name}. Your private workspace is ready."
+            : $"Welcome, {response.User.Name}. Open Settings to add your model key.";
     }
 
     public async Task LoginAsync(string email, string password)
@@ -147,7 +166,36 @@ public sealed class MainViewModel : ObservableObject
         }, email, password);
 
         await ApplyAuthResponseAsync(response);
-        StatusMessage = $"Signed in as {response.User.Email}.";
+        StatusMessage = HasProviderApiKey
+            ? $"Signed in as {response.User.Email}."
+            : $"Signed in as {response.User.Email}. Open Settings to add your model key.";
+    }
+
+    public async Task SendPasswordResetEmailAsync(string email)
+    {
+        EnsureBaseUrl();
+        var response = await _apiClient.SendPasswordResetEmailAsync(new ConnectionSettings
+        {
+            BaseUrl = BaseUrl
+        }, email);
+        StatusMessage = response.Message;
+    }
+
+    public async Task ResetPasswordAsync(string token, string password)
+    {
+        EnsureBaseUrl();
+        var response = await _apiClient.ResetPasswordAsync(new ConnectionSettings
+        {
+            BaseUrl = BaseUrl
+        }, token, password);
+        StatusMessage = response.Message;
+    }
+
+    public async Task ChangePasswordAsync(string currentPassword, string newPassword)
+    {
+        EnsureAuthenticated();
+        var response = await _apiClient.ChangePasswordAsync(CurrentSettings(), currentPassword, newPassword);
+        StatusMessage = response.Message;
     }
 
     public async Task LogoutAsync()
@@ -166,7 +214,7 @@ public sealed class MainViewModel : ObservableObject
         if (!IsAuthenticated)
         {
             ClearWorkspace();
-            StatusMessage = "Register or sign in to load your private projects and chats.";
+            StatusMessage = "Create an account or sign in to load your private projects and chats.";
             return;
         }
 
@@ -319,6 +367,7 @@ public sealed class MainViewModel : ObservableObject
     private void NotifyAuthStateChanged()
     {
         OnPropertyChanged(nameof(IsAuthenticated));
+        OnPropertyChanged(nameof(IsSignedOut));
         OnPropertyChanged(nameof(CurrentUserStatusText));
     }
 
@@ -343,7 +392,7 @@ public sealed class MainViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(ProviderApiKey))
         {
-            throw new InvalidOperationException("Enter your model API key in the desktop app before sending requests.");
+            throw new InvalidOperationException("Open Settings and add your model API key before sending requests.");
         }
     }
 
@@ -428,11 +477,12 @@ public sealed class ChatItem
 
 public sealed class MessageItem
 {
-    private static readonly Brush AssistantBackground = new SolidColorBrush(Color.FromRgb(242, 225, 199));
-    private static readonly Brush AssistantBorder = new SolidColorBrush(Color.FromRgb(205, 167, 120));
-    private static readonly Brush UserBackground = new SolidColorBrush(Color.FromRgb(21, 58, 41));
-    private static readonly Brush UserBorder = new SolidColorBrush(Color.FromRgb(34, 89, 63));
-    private static readonly Brush UserForeground = Brushes.White;
+    private static readonly Brush AssistantBackground = new SolidColorBrush(Color.FromRgb(24, 31, 41));
+    private static readonly Brush AssistantBorder = new SolidColorBrush(Color.FromRgb(42, 55, 70));
+    private static readonly Brush AssistantForeground = new SolidColorBrush(Color.FromRgb(236, 240, 244));
+    private static readonly Brush UserBackground = new SolidColorBrush(Color.FromRgb(17, 75, 58));
+    private static readonly Brush UserBorder = new SolidColorBrush(Color.FromRgb(29, 108, 82));
+    private static readonly Brush UserForeground = new SolidColorBrush(Color.FromRgb(244, 250, 247));
 
     public MessageItem(MessageDto message)
     {
@@ -446,7 +496,7 @@ public sealed class MessageItem
         BubbleAlignment = Header == "GPT-5.4" ? HorizontalAlignment.Left : HorizontalAlignment.Right;
         BubbleBackground = Header == "GPT-5.4" ? AssistantBackground : UserBackground;
         BubbleBorder = Header == "GPT-5.4" ? AssistantBorder : UserBorder;
-        Foreground = Header == "GPT-5.4" ? Brushes.Black : UserForeground;
+        Foreground = Header == "GPT-5.4" ? AssistantForeground : UserForeground;
     }
 
     public string Header { get; }

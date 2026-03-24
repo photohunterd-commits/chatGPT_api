@@ -30,6 +30,29 @@ public sealed class ChatApiClient
             password
         }, requireAuth: false);
 
+    public Task<OperationStatusResponse> SendPasswordResetEmailAsync(ConnectionSettings settings, string email) =>
+        SendAsync<OperationStatusResponse>(settings, HttpMethod.Post, "auth/forgot-password", new
+        {
+            email
+        }, requireAuth: false);
+
+    public Task<OperationStatusResponse> ResetPasswordAsync(ConnectionSettings settings, string token, string password) =>
+        SendAsync<OperationStatusResponse>(settings, HttpMethod.Post, "auth/reset-password", new
+        {
+            token,
+            password
+        }, requireAuth: false);
+
+    public Task<OperationStatusResponse> ChangePasswordAsync(
+        ConnectionSettings settings,
+        string currentPassword,
+        string newPassword) =>
+        SendAsync<OperationStatusResponse>(settings, HttpMethod.Post, "api/me/password", new
+        {
+            currentPassword,
+            newPassword
+        });
+
     public Task<UserDto> GetCurrentUserAsync(ConnectionSettings settings) =>
         SendAsync<MeResponse>(settings, HttpMethod.Get, "api/me")
             .ContinueWith(task => task.Result.User, TaskScheduler.Default);

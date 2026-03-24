@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { createHash, randomBytes } from "node:crypto";
 import { config } from "./config.js";
 import type { PublicUser } from "./database.js";
 
@@ -25,6 +26,14 @@ export function createAuthToken(user: PublicUser) {
       expiresIn: TOKEN_TTL
     }
   );
+}
+
+export function createPasswordResetToken() {
+  return randomBytes(24).toString("base64url");
+}
+
+export function hashPasswordResetToken(token: string) {
+  return createHash("sha256").update(token.trim()).digest("hex");
 }
 
 export function verifyAuthToken(token: string) {

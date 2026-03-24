@@ -1,9 +1,17 @@
 import cors from "cors";
 import express from "express";
 import { z } from "zod";
-import { createAuthToken, hashPassword, verifyAuthToken, verifyPassword } from "./auth.js";
+import {
+  createAuthToken,
+  createPasswordResetToken,
+  hashPassword,
+  hashPasswordResetToken,
+  verifyAuthToken,
+  verifyPassword
+} from "./auth.js";
 import { AppDatabase } from "./database.js";
 import { config } from "./config.js";
+import { isEmailConfigured, sendPasswordResetEmail, sendWelcomeEmail } from "./mailer.js";
 import { ProviderApiError, generateAssistantReply } from "./openai.js";
 
 const registerSchema = z.object({
@@ -15,6 +23,20 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().trim().email().max(320),
   password: z.string().min(8).max(200)
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email().max(320)
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().trim().min(16).max(200),
+  password: z.string().min(8).max(200)
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(8).max(200),
+  newPassword: z.string().min(8).max(200)
 });
 
 const projectSchema = z.object({
@@ -74,6 +96,15 @@ export function createApp(database = new AppDatabase()) {
       passwordHash
     });
 
+    try {
+      await sendWelcomeEmail({
+        email: user.email,
+        name: user.name
+      });
+    } catch (error) {
+      console.error("Failed to send welcome email", error);
+    }
+
     response.status(201).json({
       token: createAuthToken(user),
       user
@@ -103,6 +134,72 @@ export function createApp(database = new AppDatabase()) {
     response.json({
       token: createAuthToken(publicUser),
       user: publicUser
+    });
+  });
+
+  app.post("/auth/forgot-password", async (request, response) => {
+    const payload = forgotPasswordSchema.parse(request.body);
+
+    if (!isEmailConfigured()) {
+      response.status(503).json({
+        error: "Password recovery email is not configured on this server yet."
+      });
+      return;
+    }
+
+    const user = database.findUserByEmail(payload.email);
+
+    if (user) {
+      const token = createPasswordResetToken();
+      const tokenHash = hashPasswordResetToken(token);
+      const expiresAt = new Date(Date.now() + config.passwordResetTokenTtlMinutes * 60_000).toISOString();
+
+      database.invalidatePasswordResetTokensForUser(user.id);
+      database.createPasswordResetToken({
+        userId: user.id,
+        tokenHash,
+        expiresAt
+      });
+
+      await sendPasswordResetEmail({
+        email: user.email,
+        expiresInMinutes: config.passwordResetTokenTtlMinutes,
+        name: user.name,
+        token
+      });
+    }
+
+    response.json({
+      message: "If an account with this email exists, a password reset email has been sent."
+    });
+  });
+
+  app.post("/auth/reset-password", async (request, response) => {
+    const payload = resetPasswordSchema.parse(request.body);
+    const tokenRecord = database.findPasswordResetToken(hashPasswordResetToken(payload.token));
+
+    if (!tokenRecord) {
+      response.status(400).json({
+        error: "Password reset token is invalid or expired."
+      });
+      return;
+    }
+
+    const passwordHash = await hashPassword(payload.password);
+    const user = database.updateUserPassword(tokenRecord.userId, passwordHash);
+
+    if (!user) {
+      response.status(404).json({
+        error: "User not found."
+      });
+      return;
+    }
+
+    database.invalidatePasswordResetTokensForUser(tokenRecord.userId);
+    database.markPasswordResetTokenUsed(tokenRecord.id);
+
+    response.json({
+      message: "Password updated successfully."
     });
   });
 
@@ -140,6 +237,35 @@ export function createApp(database = new AppDatabase()) {
   app.get("/api/me", (request, response) => {
     response.json({
       user: request.user
+    });
+  });
+
+  app.post("/api/me/password", async (request, response) => {
+    const payload = changePasswordSchema.parse(request.body);
+    const user = database.getUserCredentials(request.user!.id);
+
+    if (!user || !(await verifyPassword(payload.currentPassword, user.passwordHash))) {
+      response.status(401).json({
+        error: "Current password is incorrect."
+      });
+      return;
+    }
+
+    const passwordHash = await hashPassword(payload.newPassword);
+    const updatedUser = database.updateUserPassword(user.id, passwordHash);
+
+    if (!updatedUser) {
+      response.status(404).json({
+        error: "User not found."
+      });
+      return;
+    }
+
+    database.invalidatePasswordResetTokensForUser(user.id);
+
+    response.json({
+      message: "Password updated successfully.",
+      user: updatedUser
     });
   });
 

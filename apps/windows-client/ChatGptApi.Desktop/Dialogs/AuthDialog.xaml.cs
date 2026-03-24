@@ -1,21 +1,27 @@
 using System.Windows;
+using ChatGptApi.Desktop.ViewModels;
 
 namespace ChatGptApi.Desktop.Dialogs;
 
 public partial class AuthDialog : Window
 {
-    public AuthDialog(bool isRegistration)
+    private readonly MainViewModel _viewModel;
+
+    public AuthDialog(MainViewModel viewModel, bool isRegistration)
     {
         InitializeComponent();
+        _viewModel = viewModel;
         IsRegistration = isRegistration;
 
         HeaderTextBlock.Text = isRegistration ? "Create Account" : "Sign In";
+        Title = isRegistration ? "Create Account" : "Sign In";
         SubmitButton.Content = isRegistration ? "Register" : "Sign In";
         NamePanel.Visibility = isRegistration ? Visibility.Visible : Visibility.Collapsed;
+        ForgotPasswordButton.Visibility = isRegistration ? Visibility.Collapsed : Visibility.Visible;
         HintTextBlock.Text = isRegistration
-            ? "Create a private account so projects and chats are isolated per user."
+            ? "Create your account first. You can add the model API key in Settings right after registration."
             : "Sign in to continue with your private projects and chats.";
-        Height = isRegistration ? 360 : 300;
+        MinHeight = isRegistration ? 470 : 390;
     }
 
     public bool IsRegistration { get; }
@@ -25,6 +31,17 @@ public partial class AuthDialog : Window
     public string Email { get; private set; } = string.Empty;
 
     public string Password { get; private set; } = string.Empty;
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (IsRegistration)
+        {
+            NameTextBox.Focus();
+            return;
+        }
+
+        EmailTextBox.Focus();
+    }
 
     private void OnSubmitClick(object sender, RoutedEventArgs e)
     {
@@ -55,5 +72,15 @@ public partial class AuthDialog : Window
     private void OnCancelClick(object sender, RoutedEventArgs e)
     {
         DialogResult = false;
+    }
+
+    private void OnForgotPasswordClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new PasswordRecoveryDialog(_viewModel)
+        {
+            Owner = this
+        };
+
+        dialog.ShowDialog();
     }
 }

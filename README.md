@@ -16,9 +16,9 @@ The recommended path for users is GitHub Releases:
 2. Download `gpt54-workspace-setup-<version>.exe`.
 3. Install and launch the desktop app.
 4. Register or sign in inside the app.
-5. Enter a personal provider API key inside the app before sending messages.
+5. Open `Settings` inside the app and save a personal provider API key before sending messages.
 
-The desktop app is preconfigured to use the hosted backend at `http://62.109.2.121:3030`, so users do not need to build or configure anything for the basic flow.
+The desktop app is preconfigured to use the hosted backend at `http://62.109.2.121:3030`, so users do not need to see or configure the backend URL for the basic flow.
 
 If a user also works from VS Code:
 
@@ -27,6 +27,11 @@ If a user also works from VS Code:
 3. Sign in and save a personal provider API key inside the extension.
 
 Both clients show a clear warning when the provider rejects the key, the quota is exceeded, or the balance is exhausted.
+
+The desktop client also supports:
+
+- changing the password for the signed-in user
+- password recovery by email when SMTP is configured on the server
 
 ## Structure
 
@@ -44,6 +49,16 @@ Both clients show a clear warning when the provider rejects the key, the quota i
 4. Leave `OPENAI_API_KEY` empty when each user should bring their own key.
 5. Run `npm.cmd install`.
 6. Run `npm.cmd run dev:server`.
+
+Optional email settings for welcome and password reset emails:
+
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASSWORD`
+- `SMTP_FROM`
+- `PASSWORD_RESET_TOKEN_TTL_MINUTES`
 
 Useful build commands:
 
