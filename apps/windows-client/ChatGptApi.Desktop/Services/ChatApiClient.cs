@@ -92,14 +92,18 @@ public sealed class ChatApiClient
         object? body = null,
         bool requireAuth = true)
     {
-        ConfigureClient(settings, requireAuth);
-
-        using var request = new HttpRequestMessage(method, relativePath);
+        var requestUri = BuildRequestUri(settings, relativePath, requireAuth);
+        using var request = new HttpRequestMessage(method, requestUri);
 
         if (body is not null)
         {
             var json = JsonSerializer.Serialize(body, SerializerOptions);
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        }
+
+        if (requireAuth)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.AuthToken.Trim());
         }
 
         if (!string.IsNullOrWhiteSpace(settings.ProviderApiKey))
@@ -125,7 +129,7 @@ public sealed class ChatApiClient
         return result;
     }
 
-    private void ConfigureClient(ConnectionSettings settings, bool requireAuth)
+    private static Uri BuildRequestUri(ConnectionSettings settings, string relativePath, bool requireAuth)
     {
         var trimmedBaseUrl = settings.BaseUrl.Trim().TrimEnd('/');
 
@@ -139,10 +143,7 @@ public sealed class ChatApiClient
             throw new InvalidOperationException("You need to sign in first.");
         }
 
-        _httpClient.BaseAddress = new Uri($"{trimmedBaseUrl}/");
-        _httpClient.DefaultRequestHeaders.Authorization = requireAuth
-            ? new AuthenticationHeaderValue("Bearer", settings.AuthToken.Trim())
-            : null;
+        return new Uri($"{trimmedBaseUrl}/{relativePath.TrimStart('/')}");
     }
 
     private static string ExtractError(string payload, string? fallback)

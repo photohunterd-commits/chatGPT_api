@@ -2,7 +2,7 @@
   "name": "codex-project-bridge",
   "displayName": "Codex Project Bridge",
   "description": "VS Code utility for Codex workflows backed by the shared project chat server, with GPT-5 mini as the default Codex model.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "photohunterd",
   "private": true,
   "license": "MIT",
