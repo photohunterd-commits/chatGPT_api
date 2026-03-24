@@ -177,11 +177,15 @@
                     </StackPanel>
 
                     <ListBox ItemsSource="{Binding Projects}"
+                             x:Name="ProjectsListBox"
                              SelectedItem="{Binding SelectedProject, Mode=TwoWay}"
+                             PreviewMouseLeftButtonUp="OnProjectsListMouseLeftButtonUp"
                              SelectionChanged="OnProjectSelectionChanged">
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="{x:Type local:ProjectItem}">
-                                <Border Margin="0,0,0,8"
+                                <Border Width="196"
+                                        MinHeight="86"
+                                        Margin="0,0,0,8"
                                         Padding="12,11">
                                     <Border.Style>
                                         <Style TargetType="Border">
@@ -189,6 +193,7 @@
                                             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
                                             <Setter Property="BorderThickness" Value="1" />
                                             <Setter Property="CornerRadius" Value="18" />
+                                            <Setter Property="Cursor" Value="Hand" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}"
                                                              Value="True">
@@ -273,11 +278,15 @@
                     </StackPanel>
 
                     <ListBox ItemsSource="{Binding Chats}"
+                             x:Name="ChatsListBox"
                              SelectedItem="{Binding SelectedChat, Mode=TwoWay}"
+                             PreviewMouseLeftButtonUp="OnChatsListMouseLeftButtonUp"
                              SelectionChanged="OnChatSelectionChanged">
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="{x:Type local:ChatItem}">
-                                <Border Margin="0,0,0,8"
+                                <Border Width="196"
+                                        MinHeight="108"
+                                        Margin="0,0,0,8"
                                         Padding="12,11">
                                     <Border.Style>
                                         <Style TargetType="Border">
@@ -285,6 +294,7 @@
                                             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
                                             <Setter Property="BorderThickness" Value="1" />
                                             <Setter Property="CornerRadius" Value="18" />
+                                            <Setter Property="Cursor" Value="Hand" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}"
                                                              Value="True">

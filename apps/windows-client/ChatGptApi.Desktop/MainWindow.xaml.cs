@@ -111,6 +111,16 @@ public partial class MainWindow : Window
         await RunSafeAsync(_viewModel.LoadMessagesForSelectedChatAsync);
     }
 
+    private void OnProjectsListMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        SelectListItemFromPointer(ProjectsListBox, e.OriginalSource as DependencyObject);
+    }
+
+    private void OnChatsListMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        SelectListItemFromPointer(ChatsListBox, e.OriginalSource as DependencyObject);
+    }
+
     private async void OnCreateProjectClick(object sender, RoutedEventArgs e)
     {
         var dialog = new ProjectDialog
@@ -219,6 +229,20 @@ public partial class MainWindow : Window
         }
 
         return null;
+    }
+
+    private static void SelectListItemFromPointer(ListBox listBox, DependencyObject? source)
+    {
+        if (source is null)
+        {
+            return;
+        }
+
+        if (ItemsControl.ContainerFromElement(listBox, source) is ListBoxItem item)
+        {
+            item.IsSelected = true;
+            item.Focus();
+        }
     }
 
     private async Task<bool> RunSafeAsync(Func<Task> action)
