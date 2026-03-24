@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ChatGptApi.Desktop.Models;
 
 namespace ChatGptApi.Desktop.Services;
@@ -10,7 +11,9 @@ public sealed class ChatApiClient
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
     private readonly HttpClient _httpClient = new();
@@ -159,6 +162,34 @@ public sealed class ChatApiClient
 
             if (document.RootElement.TryGetProperty("error", out var errorElement))
             {
+                if (string.Equals(errorElement.GetString(), "Validation failed", StringComparison.OrdinalIgnoreCase)
+                    && document.RootElement.TryGetProperty("issues", out var issuesElement)
+                    && issuesElement.ValueKind == JsonValueKind.Array)
+                {
+                    var details = issuesElement
+                        .EnumerateArray()
+                        .Select(issue =>
+                        {
+                            var path = issue.TryGetProperty("path", out var pathElement) && pathElement.ValueKind == JsonValueKind.Array
+                                ? string.Join(".", pathElement.EnumerateArray().Select(segment => segment.ToString()))
+                                : "request";
+                            var message = issue.TryGetProperty("message", out var messageElement)
+                                ? messageElement.GetString()
+                                : null;
+
+                            return string.IsNullOrWhiteSpace(message)
+                                ? null
+                                : $"{path}: {message}";
+                        })
+                        .Where(detail => !string.IsNullOrWhiteSpace(detail))
+                        .ToArray();
+
+                    if (details.Length > 0)
+                    {
+                        return string.Join(Environment.NewLine, details);
+                    }
+                }
+
                 return errorElement.GetString() ?? fallback ?? "The request failed.";
             }
         }
