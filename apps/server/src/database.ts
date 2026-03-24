@@ -27,6 +27,38 @@ interface PasswordResetTokenRow {
   createdAt: string;
 }
 
+export interface UsageEventRecord {
+  id: string;
+  userId: string;
+  chatId: string;
+  model: string;
+  periodMonth: string;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  webSearchCalls: number;
+  inputCostRub: number;
+  cachedInputCostRub: number;
+  outputCostRub: number;
+  webSearchCostRub: number;
+  totalCostRub: number;
+  createdAt: string;
+}
+
+export interface MonthlyBillingSummary {
+  periodMonth: string;
+  requestCount: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  webSearchCalls: number;
+  inputCostRub: number;
+  cachedInputCostRub: number;
+  outputCostRub: number;
+  webSearchCostRub: number;
+  totalCostRub: number;
+}
+
 export interface ProjectRecord {
   id: string;
   userId: string;
@@ -129,12 +161,33 @@ export class AppDatabase {
         created_at TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS usage_events (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        chat_id TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+        model TEXT NOT NULL,
+        period_month TEXT NOT NULL,
+        input_tokens INTEGER NOT NULL,
+        cached_input_tokens INTEGER NOT NULL,
+        output_tokens INTEGER NOT NULL,
+        web_search_calls INTEGER NOT NULL,
+        input_cost_rub REAL NOT NULL,
+        cached_input_cost_rub REAL NOT NULL,
+        output_cost_rub REAL NOT NULL,
+        web_search_cost_rub REAL NOT NULL,
+        total_cost_rub REAL NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
       CREATE INDEX IF NOT EXISTS idx_chats_project_id ON chats(project_id);
       CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
       CREATE INDEX IF NOT EXISTS idx_messages_chat_created_at ON messages(chat_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
       CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
+      CREATE INDEX IF NOT EXISTS idx_usage_events_user_period ON usage_events(user_id, period_month);
+      CREATE INDEX IF NOT EXISTS idx_usage_events_chat_id ON usage_events(chat_id);
+      CREATE INDEX IF NOT EXISTS idx_usage_events_created_at ON usage_events(created_at);
     `);
 
     const projectColumns = this.db.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
@@ -319,6 +372,107 @@ export class AppDatabase {
       `
       )
       .run(new Date().toISOString(), userId);
+  }
+
+  createUsageEvent(
+    input: Omit<UsageEventRecord, "createdAt" | "id" | "periodMonth"> & { createdAt?: string; periodMonth?: string }
+  ) {
+    const usageEvent: UsageEventRecord = {
+      id: randomUUID(),
+      userId: input.userId,
+      chatId: input.chatId,
+      model: input.model.trim(),
+      periodMonth: input.periodMonth ?? getBillingPeriodMonth(),
+      inputTokens: input.inputTokens,
+      cachedInputTokens: input.cachedInputTokens,
+      outputTokens: input.outputTokens,
+      webSearchCalls: input.webSearchCalls,
+      inputCostRub: input.inputCostRub,
+      cachedInputCostRub: input.cachedInputCostRub,
+      outputCostRub: input.outputCostRub,
+      webSearchCostRub: input.webSearchCostRub,
+      totalCostRub: input.totalCostRub,
+      createdAt: input.createdAt ?? new Date().toISOString()
+    };
+
+    this.db
+      .prepare(
+        `
+        INSERT INTO usage_events (
+          id,
+          user_id,
+          chat_id,
+          model,
+          period_month,
+          input_tokens,
+          cached_input_tokens,
+          output_tokens,
+          web_search_calls,
+          input_cost_rub,
+          cached_input_cost_rub,
+          output_cost_rub,
+          web_search_cost_rub,
+          total_cost_rub,
+          created_at
+        )
+        VALUES (
+          @id,
+          @userId,
+          @chatId,
+          @model,
+          @periodMonth,
+          @inputTokens,
+          @cachedInputTokens,
+          @outputTokens,
+          @webSearchCalls,
+          @inputCostRub,
+          @cachedInputCostRub,
+          @outputCostRub,
+          @webSearchCostRub,
+          @totalCostRub,
+          @createdAt
+        )
+      `
+      )
+      .run(usageEvent);
+
+    return usageEvent;
+  }
+
+  getMonthlyBillingSummary(userId: string, periodMonth = getBillingPeriodMonth()): MonthlyBillingSummary {
+    const row = this.db
+      .prepare(
+        `
+        SELECT
+          COUNT(*) AS requestCount,
+          COALESCE(SUM(input_tokens), 0) AS inputTokens,
+          COALESCE(SUM(cached_input_tokens), 0) AS cachedInputTokens,
+          COALESCE(SUM(output_tokens), 0) AS outputTokens,
+          COALESCE(SUM(web_search_calls), 0) AS webSearchCalls,
+          COALESCE(SUM(input_cost_rub), 0) AS inputCostRub,
+          COALESCE(SUM(cached_input_cost_rub), 0) AS cachedInputCostRub,
+          COALESCE(SUM(output_cost_rub), 0) AS outputCostRub,
+          COALESCE(SUM(web_search_cost_rub), 0) AS webSearchCostRub,
+          COALESCE(SUM(total_cost_rub), 0) AS totalCostRub
+        FROM usage_events
+        WHERE user_id = ? AND period_month = ?
+      `
+      )
+      .get(userId, periodMonth) as Omit<MonthlyBillingSummary, "periodMonth"> | undefined;
+
+    return {
+      periodMonth,
+      requestCount: Number(row?.requestCount ?? 0),
+      inputTokens: Number(row?.inputTokens ?? 0),
+      cachedInputTokens: Number(row?.cachedInputTokens ?? 0),
+      outputTokens: Number(row?.outputTokens ?? 0),
+      webSearchCalls: Number(row?.webSearchCalls ?? 0),
+      inputCostRub: Number(row?.inputCostRub ?? 0),
+      cachedInputCostRub: Number(row?.cachedInputCostRub ?? 0),
+      outputCostRub: Number(row?.outputCostRub ?? 0),
+      webSearchCostRub: Number(row?.webSearchCostRub ?? 0),
+      totalCostRub: Number(row?.totalCostRub ?? 0)
+    };
   }
 
   listProjects(userId: string): ProjectSummary[] {
@@ -604,4 +758,17 @@ export class AppDatabase {
       updatedAt: user.updatedAt
     };
   }
+}
+
+function getBillingPeriodMonth(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: config.billing.timezone,
+    year: "numeric",
+    month: "2-digit"
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value ?? date.getUTCFullYear().toString();
+  const month = parts.find((part) => part.type === "month")?.value ?? String(date.getUTCMonth() + 1).padStart(2, "0");
+
+  return `${year}-${month}`;
 }

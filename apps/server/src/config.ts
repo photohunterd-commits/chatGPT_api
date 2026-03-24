@@ -16,11 +16,14 @@ const envSchema = z.object({
   OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
   OPENAI_MODEL: z.string().default("gpt-5.4"),
   OPENAI_REASONING_EFFORT: z.enum(["low", "medium", "high", "xhigh"]).default("medium"),
+  OPENAI_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(4000),
   JWT_SECRET: z.string().min(32),
   PORT: z.coerce.number().int().positive().default(3030),
   HOST: z.string().default("0.0.0.0"),
   CORS_ORIGIN: z.string().default("*"),
   DATA_DIR: z.string().default("./data"),
+  BILLING_TIMEZONE: z.string().default("Europe/Moscow"),
+  MONTHLY_USER_BUDGET_RUB: z.coerce.number().positive().default(1000),
   SMTP_HOST: optionalEnvString(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
   SMTP_SECURE: z
@@ -39,8 +42,13 @@ export const config = {
   corsOrigin: env.CORS_ORIGIN,
   dataDir: resolve(process.cwd(), env.DATA_DIR),
   host: env.HOST,
+  billing: {
+    monthlyUserBudgetRub: env.MONTHLY_USER_BUDGET_RUB,
+    timezone: env.BILLING_TIMEZONE
+  },
   openAiApiKey: env.OPENAI_API_KEY,
   openAiBaseUrl: env.OPENAI_BASE_URL,
+  openAiMaxOutputTokens: env.OPENAI_MAX_OUTPUT_TOKENS,
   openAiModel: env.OPENAI_MODEL,
   openAiReasoningEffort: env.OPENAI_REASONING_EFFORT,
   jwtSecret: env.JWT_SECRET,

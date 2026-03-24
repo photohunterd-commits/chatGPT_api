@@ -195,7 +195,9 @@ public partial class MainWindow : Window
     {
         if (message.Contains("balance", StringComparison.OrdinalIgnoreCase)
             || message.Contains("quota", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("API key", StringComparison.OrdinalIgnoreCase))
+            || message.Contains("API key", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("budget", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("limit", StringComparison.OrdinalIgnoreCase))
         {
             return "Model API Key Notice";
         }
@@ -207,7 +209,9 @@ public partial class MainWindow : Window
     {
         if (message.Contains("balance", StringComparison.OrdinalIgnoreCase)
             || message.Contains("quota", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("API key", StringComparison.OrdinalIgnoreCase))
+            || message.Contains("API key", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("budget", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("limit", StringComparison.OrdinalIgnoreCase))
         {
             return MessageBoxImage.Warning;
         }

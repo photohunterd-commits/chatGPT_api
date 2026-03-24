@@ -5,8 +5,8 @@ Russian guide: [README.ru.md](README.ru.md)
 This repository contains:
 
 1. A multi-user chat backend with private projects, chats, and SQLite storage.
-2. A native Windows desktop client for registration, sign-in, project management, and chat.
-3. A VS Code extension for Codex-oriented workflows that connects to the same private workspace.
+2. A native Windows desktop client for registration, sign-in, project management, and chat on `gpt-5.4`.
+3. A VS Code extension for Codex-oriented workflows that connects to the same private workspace and defaults to `gpt-5-mini` for lower cost.
 
 ## End-User Install
 
@@ -26,12 +26,13 @@ If a user also works from VS Code:
 2. Install it with `Extensions: Install from VSIX...`.
 3. Sign in and save a personal provider API key inside the extension.
 
-Both clients show a clear warning when the provider rejects the key, the quota is exceeded, or the balance is exhausted.
+Both clients show a clear warning when the provider rejects the key, the quota is exceeded, the balance is exhausted, or the monthly user budget is reached.
 
 The desktop client also supports:
 
 - changing the password for the signed-in user
 - password recovery by email when SMTP is configured on the server
+- showing the current monthly spend for the signed-in user
 
 ## Structure
 
@@ -59,6 +60,18 @@ Optional email settings for welcome and password reset emails:
 - `SMTP_PASSWORD`
 - `SMTP_FROM`
 - `PASSWORD_RESET_TOKEN_TTL_MINUTES`
+
+Optional billing and budget controls:
+
+- `OPENAI_MAX_OUTPUT_TOKENS`
+- `BILLING_TIMEZONE`
+- `MONTHLY_USER_BUDGET_RUB`
+
+Current AITUNNEL pricing snapshot used on the server for billing on March 24, 2026:
+
+- `gpt-5.4` - `480 RUB / 1M input`, `48 RUB / 1M cache read`, `2880 RUB / 1M output`
+- `gpt-5-mini` - `48 RUB / 1M input`, `4.8 RUB / 1M cache read`, `384 RUB / 1M output`
+- `web search` - `1.92 RUB / call`
 
 Useful build commands:
 
@@ -88,6 +101,7 @@ Expected release assets:
 - The provider API key is entered separately in the desktop app and the VS Code extension.
 - The backend accepts a per-request provider key via header, so personal keys do not live in git.
 - If the provider rejects the key or the balance is exhausted, the backend returns a user-friendly warning.
+- The backend keeps a monthly per-user usage ledger in SQLite and blocks new model calls when the configured budget is exhausted.
 
 ## Deployment
 

@@ -67,6 +67,8 @@ public sealed class MessageSendResponse
     public MessageDto UserMessage { get; set; } = new();
 
     public MessageDto AssistantMessage { get; set; } = new();
+
+    public BillingSummaryDto Billing { get; set; } = new();
 }
 
 public sealed class UserDto
@@ -88,6 +90,8 @@ public sealed class AuthResponse
 public sealed class MeResponse
 {
     public UserDto User { get; set; } = new();
+
+    public BillingSummaryDto Billing { get; set; } = new();
 }
 
 public sealed class OperationStatusResponse
@@ -104,4 +108,31 @@ public sealed class CreateProjectRequest
     public string Description { get; set; } = string.Empty;
 
     public string SystemPrompt { get; set; } = string.Empty;
+}
+
+public sealed class BillingSummaryDto
+{
+    public string PeriodMonth { get; set; } = string.Empty;
+
+    public string Currency { get; set; } = "RUB";
+
+    public double LimitRub { get; set; }
+
+    public double SpentRub { get; set; }
+
+    public double RemainingRub { get; set; }
+
+    public bool IsLimitReached { get; set; }
+
+    public int MaxOutputTokens { get; set; }
+
+    public int RequestCount { get; set; }
+
+    public int InputTokens { get; set; }
+
+    public int CachedInputTokens { get; set; }
+
+    public int OutputTokens { get; set; }
+
+    public int WebSearchCalls { get; set; }
 }

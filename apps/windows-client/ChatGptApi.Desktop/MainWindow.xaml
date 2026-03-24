@@ -80,6 +80,18 @@
                         </StackPanel>
                     </Border>
 
+                    <Border Style="{StaticResource ChipBorderStyle}"
+                            Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Foreground="{Binding BillingBrush}"
+                                       FontWeight="SemiBold"
+                                       Text="Budget" />
+                            <TextBlock Margin="8,0,0,0"
+                                       Foreground="{Binding BillingBrush}"
+                                       Text="{Binding BillingChipText}" />
+                        </StackPanel>
+                    </Border>
+
                     <Button Style="{StaticResource SecondaryButtonStyle}"
                             Margin="0,0,10,0"
                             Click="OnSettingsClick">
@@ -356,6 +368,9 @@
                                 <TextBlock Margin="0,8,0,0"
                                            Foreground="{StaticResource AccentBrush}"
                                            Text="{Binding ProviderKeyStatusText}" />
+                                <TextBlock Margin="0,8,0,0"
+                                           Foreground="{Binding BillingBrush}"
+                                           Text="{Binding BillingDetailText}" />
                             </StackPanel>
 
                             <Border Grid.Column="1"

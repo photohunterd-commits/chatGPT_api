@@ -11,8 +11,10 @@ import {
 } from "./auth.js";
 import { AppDatabase } from "./database.js";
 import { config } from "./config.js";
+import { AppApiError } from "./errors.js";
 import { isEmailConfigured, sendPasswordResetEmail, sendWelcomeEmail } from "./mailer.js";
 import { ProviderApiError, generateAssistantReply } from "./openai.js";
+import { calculateUsageCost, getSupportedModelPricing, resolveModelPricing } from "./pricing.js";
 
 const registerSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -236,7 +238,14 @@ export function createApp(database = new AppDatabase()) {
 
   app.get("/api/me", (request, response) => {
     response.json({
-      user: request.user
+      user: request.user,
+      billing: createBillingResponse(database, request.user!.id)
+    });
+  });
+
+  app.get("/api/me/billing", (request, response) => {
+    response.json({
+      billing: createBillingResponse(database, request.user!.id)
     });
   });
 
@@ -371,6 +380,24 @@ export function createApp(database = new AppDatabase()) {
       return;
     }
 
+    if (!resolveModelPricing(chat.model)) {
+      throw new AppApiError(
+        `Model pricing is not configured on this server for "${chat.model}".`,
+        400,
+        "model_pricing_missing"
+      );
+    }
+
+    const currentBilling = createBillingResponse(database, request.user!.id);
+
+    if (currentBilling.isLimitReached) {
+      throw new AppApiError(
+        `Monthly budget reached: ${formatRubles(currentBilling.spentRub)} of ${formatRubles(currentBilling.limitRub)} already spent for ${currentBilling.periodMonth}. Wait for the new month or increase MONTHLY_USER_BUDGET_RUB on the server.`,
+        402,
+        "monthly_budget_exceeded"
+      );
+    }
+
     const payload = messageSchema.parse(request.body);
     const userMessage = database.addMessage({
       chatId: chat.id,
@@ -388,7 +415,7 @@ export function createApp(database = new AppDatabase()) {
         content: message.content
       }));
 
-    const assistantText = await generateAssistantReply({
+    const assistantReply = await generateAssistantReply({
       apiKey: request.header("x-provider-api-key") ?? undefined,
       instructions: project.systemPrompt,
       messages: history,
@@ -396,16 +423,44 @@ export function createApp(database = new AppDatabase()) {
       reasoningEffort: chat.reasoningEffort
     });
 
+    const usageCost = calculateUsageCost(chat.model, assistantReply.usage);
+
+    database.createUsageEvent({
+      userId: request.user!.id,
+      chatId: chat.id,
+      model: chat.model,
+      inputTokens: usageCost.inputTokens,
+      cachedInputTokens: usageCost.cachedInputTokens,
+      outputTokens: usageCost.outputTokens,
+      webSearchCalls: usageCost.webSearchCalls,
+      inputCostRub: usageCost.inputCostRub,
+      cachedInputCostRub: usageCost.cachedInputCostRub,
+      outputCostRub: usageCost.outputCostRub,
+      webSearchCostRub: usageCost.webSearchCostRub,
+      totalCostRub: usageCost.totalCostRub
+    });
+
     const assistantMessage = database.addMessage({
       chatId: chat.id,
       role: "assistant",
-      content: assistantText,
-      source: "openai"
+      content: assistantReply.text,
+      source: "openai",
+      metadata: {
+        billing: {
+          cachedInputTokens: usageCost.cachedInputTokens,
+          inputTokens: usageCost.inputTokens,
+          outputTokens: usageCost.outputTokens,
+          totalCostRub: usageCost.totalCostRub,
+          webSearchCalls: usageCost.webSearchCalls
+        },
+        model: usageCost.pricing.label
+      }
     });
 
     response.status(201).json({
       userMessage,
-      assistantMessage
+      assistantMessage,
+      billing: createBillingResponse(database, request.user!.id)
     });
   });
 
@@ -426,6 +481,14 @@ export function createApp(database = new AppDatabase()) {
       return;
     }
 
+    if (error instanceof AppApiError) {
+      response.status(error.statusCode).json({
+        error: error.message,
+        code: error.code
+      });
+      return;
+    }
+
     console.error(error);
 
     response.status(500).json({
@@ -434,4 +497,42 @@ export function createApp(database = new AppDatabase()) {
   });
 
   return app;
+}
+
+function createBillingResponse(database: AppDatabase, userId: string) {
+  const summary = database.getMonthlyBillingSummary(userId);
+  const limitRub = config.billing.monthlyUserBudgetRub;
+  const spentRub = toMoney(summary.totalCostRub);
+  const remainingRub = toMoney(Math.max(0, limitRub - spentRub));
+
+  return {
+    periodMonth: summary.periodMonth,
+    currency: "RUB",
+    limitRub: toMoney(limitRub),
+    spentRub,
+    remainingRub,
+    isLimitReached: spentRub >= limitRub,
+    maxOutputTokens: config.openAiMaxOutputTokens,
+    requestCount: summary.requestCount,
+    inputTokens: summary.inputTokens,
+    cachedInputTokens: summary.cachedInputTokens,
+    outputTokens: summary.outputTokens,
+    webSearchCalls: summary.webSearchCalls,
+    supportedModels: getSupportedModelPricing().map((item) => ({
+      model: item.model,
+      label: item.label,
+      inputRubPer1M: item.inputRubPer1M,
+      cachedInputRubPer1M: item.cachedInputRubPer1M,
+      outputRubPer1M: item.outputRubPer1M,
+      webSearchRubPerCall: item.webSearchRubPerCall
+    }))
+  };
+}
+
+function formatRubles(value: number) {
+  return `${toMoney(value).toFixed(2)} RUB`;
+}
+
+function toMoney(value: number) {
+  return Number(value.toFixed(2));
 }

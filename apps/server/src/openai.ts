@@ -17,6 +17,13 @@ interface ModelMessage {
   content: string;
 }
 
+export interface ModelUsage {
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  webSearchCalls: number;
+}
+
 export async function generateAssistantReply(input: {
   apiKey?: string;
   instructions?: string;
@@ -43,6 +50,7 @@ export async function generateAssistantReply(input: {
     const response = await client.responses.create({
       model: input.model,
       instructions: input.instructions || undefined,
+      max_output_tokens: config.openAiMaxOutputTokens,
       reasoning: {
         effort: input.reasoningEffort
       },
@@ -63,7 +71,12 @@ export async function generateAssistantReply(input: {
       );
     }
 
-    return text;
+    const usage = extractUsage(response.usage, response.output);
+
+    return {
+      text,
+      usage
+    };
   } catch (error) {
     throw normalizeProviderError(error);
   }
@@ -137,4 +150,59 @@ function extractText(output: unknown): string {
   }
 
   return fragments.join("\n\n").trim();
+}
+
+function extractUsage(rawUsage: unknown, output: unknown): ModelUsage {
+  if (typeof rawUsage !== "object" || rawUsage === null) {
+    throw new ProviderApiError(
+      "The model provider did not return usage data required for billing.",
+      502,
+      "provider_usage_missing"
+    );
+  }
+
+  const usage = rawUsage as {
+    input_tokens?: number;
+    input_tokens_details?: { cached_tokens?: number };
+    output_tokens?: number;
+  };
+
+  return {
+    inputTokens: clampUsageNumber(usage.input_tokens),
+    cachedInputTokens: clampUsageNumber(usage.input_tokens_details?.cached_tokens),
+    outputTokens: clampUsageNumber(usage.output_tokens),
+    webSearchCalls: countWebSearchCalls(output)
+  };
+}
+
+function countWebSearchCalls(output: unknown) {
+  if (!Array.isArray(output)) {
+    return 0;
+  }
+
+  const identifiers = new Set<string>();
+
+  for (const item of output) {
+    if (typeof item !== "object" || item === null) {
+      continue;
+    }
+
+    const candidate = item as { id?: unknown; status?: unknown; type?: unknown };
+
+    if (candidate.type !== "web_search_call" || candidate.status === "failed") {
+      continue;
+    }
+
+    if (typeof candidate.id === "string" && candidate.id.trim()) {
+      identifiers.add(candidate.id);
+    }
+  }
+
+  return identifiers.size;
+}
+
+function clampUsageNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : 0;
 }

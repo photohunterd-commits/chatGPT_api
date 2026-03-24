@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
@@ -12,9 +13,14 @@ public sealed class MainViewModel : ObservableObject
 {
     private readonly ChatApiClient _apiClient;
     private readonly ConnectionSettingsStore _settingsStore;
+    private static readonly Brush BillingNeutralBrush = new SolidColorBrush(Color.FromRgb(148, 168, 189));
+    private static readonly Brush BillingHealthyBrush = new SolidColorBrush(Color.FromRgb(64, 199, 155));
+    private static readonly Brush BillingWarningBrush = new SolidColorBrush(Color.FromRgb(237, 170, 64));
+    private static readonly Brush BillingDangerBrush = new SolidColorBrush(Color.FromRgb(228, 91, 91));
 
     private string _authToken = string.Empty;
     private string _baseUrl = ConnectionSettings.DefaultBaseUrl;
+    private BillingSummaryDto? _billing;
     private string _currentUserEmail = string.Empty;
     private string _currentUserName = string.Empty;
     private string _draftMessage = string.Empty;
@@ -97,6 +103,24 @@ public sealed class MainViewModel : ObservableObject
     public string SelectedChatSubtitle => SelectedChat is null
         ? "Projects and chats stay private for the signed-in user."
         : $"{SelectedChat.Model} / {SelectedChat.ReasoningEffort}";
+
+    public string BillingChipText => _billing is null
+        ? "Monthly spend: not loaded yet"
+        : $"This month: {FormatRubles(_billing.SpentRub)} / {FormatRubles(_billing.LimitRub)}";
+
+    public string BillingDetailText => _billing is null
+        ? "Per-user spend is tracked on the server and resets every month."
+        : _billing.IsLimitReached
+            ? $"Monthly limit reached for {_billing.PeriodMonth}. New requests will pause until the next month."
+            : $"{FormatRubles(_billing.RemainingRub)} left this month. Max reply size: {_billing.MaxOutputTokens} tokens.";
+
+    public Brush BillingBrush => _billing is null
+        ? BillingNeutralBrush
+        : _billing.IsLimitReached
+            ? BillingDangerBrush
+            : _billing.SpentRub >= _billing.LimitRub * 0.8
+                ? BillingWarningBrush
+                : BillingHealthyBrush;
 
     public bool HasProviderApiKey => !string.IsNullOrWhiteSpace(_providerApiKey);
 
@@ -220,8 +244,9 @@ public sealed class MainViewModel : ObservableObject
 
         try
         {
-            var user = await _apiClient.GetCurrentUserAsync(CurrentSettings());
-            ApplyUser(user);
+            var session = await _apiClient.GetMeAsync(CurrentSettings());
+            ApplyUser(session.User);
+            ApplyBilling(session.Billing);
 
             var selectedProjectId = SelectedProject?.Id;
             var selectedChatId = SelectedChat?.Id;
@@ -328,10 +353,13 @@ public sealed class MainViewModel : ObservableObject
 
         var response = await _apiClient.SendMessageAsync(CurrentSettings(), SelectedChat.Id, content);
         DraftMessage = string.Empty;
+        ApplyBilling(response.Billing);
 
         Messages.Add(new MessageItem(response.UserMessage));
         Messages.Add(new MessageItem(response.AssistantMessage));
-        StatusMessage = "GPT-5.4 replied successfully.";
+        StatusMessage = response.Billing.IsLimitReached
+            ? $"Reply received. Monthly limit is now exhausted at {FormatRubles(response.Billing.SpentRub)}."
+            : $"Reply received. Spent this month: {FormatRubles(response.Billing.SpentRub)}.";
     }
 
     private async Task ApplyAuthResponseAsync(AuthResponse response)
@@ -348,6 +376,14 @@ public sealed class MainViewModel : ObservableObject
         _currentUserName = user.Name;
         _currentUserEmail = user.Email;
         NotifyAuthStateChanged();
+    }
+
+    private void ApplyBilling(BillingSummaryDto? billing)
+    {
+        _billing = billing;
+        OnPropertyChanged(nameof(BillingChipText));
+        OnPropertyChanged(nameof(BillingDetailText));
+        OnPropertyChanged(nameof(BillingBrush));
     }
 
     private async Task PersistSettingsAsync()
@@ -378,6 +414,7 @@ public sealed class MainViewModel : ObservableObject
         Messages.Clear();
         SelectedProject = null;
         SelectedChat = null;
+        ApplyBilling(null);
     }
 
     private void EnsureAuthenticated()
@@ -417,6 +454,11 @@ public sealed class MainViewModel : ObservableObject
         {
             target.Add(item);
         }
+    }
+
+    private static string FormatRubles(double value)
+    {
+        return $"{value.ToString("0.00", CultureInfo.InvariantCulture)} RUB";
     }
 }
 

@@ -1,8 +1,8 @@
 {
   "name": "codex-project-bridge",
   "displayName": "Codex Project Bridge",
-  "description": "VS Code utility for Codex workflows backed by the GPT-5.4 project chat server.",
-  "version": "0.2.0",
+  "description": "VS Code utility for Codex workflows backed by the shared project chat server, with GPT-5 mini as the default Codex model.",
+  "version": "0.3.0",
   "publisher": "photohunterd",
   "private": true,
   "license": "MIT",
@@ -24,6 +24,7 @@
     "Other"
   ],
   "activationEvents": [
+    "onView:codexBridge.home",
     "onView:codexBridge.explorer",
     "onCommand:codexBridge.register",
     "onCommand:codexBridge.login",
@@ -54,6 +55,10 @@
     },
     "views": {
       "codexBridge": [
+        {
+          "id": "codexBridge.home",
+          "name": "Codex"
+        },
         {
           "id": "codexBridge.explorer",
           "name": "Projects & Chats"
@@ -113,6 +118,16 @@
     "menus": {
       "view/title": [
         {
+          "command": "codexBridge.configureProviderKey",
+          "when": "view == codexBridge.home",
+          "group": "navigation"
+        },
+        {
+          "command": "codexBridge.refresh",
+          "when": "view == codexBridge.home",
+          "group": "navigation"
+        },
+        {
           "command": "codexBridge.register",
           "when": "view == codexBridge.explorer",
           "group": "navigation"
@@ -159,11 +174,6 @@
     "configuration": {
       "title": "Codex Project Bridge",
       "properties": {
-        "codexBridge.baseUrl": {
-          "type": "string",
-          "default": "http://62.109.2.121:3030",
-          "description": "Base URL of the GPT-5.4 chat backend."
-        },
         "codexBridge.userEmail": {
           "type": "string",
           "default": "",

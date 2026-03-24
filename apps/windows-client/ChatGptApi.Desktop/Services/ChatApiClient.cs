@@ -53,9 +53,16 @@ public sealed class ChatApiClient
             newPassword
         });
 
+    public Task<MeResponse> GetMeAsync(ConnectionSettings settings) =>
+        SendAsync<MeResponse>(settings, HttpMethod.Get, "api/me");
+
     public Task<UserDto> GetCurrentUserAsync(ConnectionSettings settings) =>
-        SendAsync<MeResponse>(settings, HttpMethod.Get, "api/me")
+        GetMeAsync(settings)
             .ContinueWith(task => task.Result.User, TaskScheduler.Default);
+
+    public Task<BillingSummaryDto> GetBillingAsync(ConnectionSettings settings) =>
+        SendAsync<BillingResponse>(settings, HttpMethod.Get, "api/me/billing")
+            .ContinueWith(task => task.Result.Billing, TaskScheduler.Default);
 
     public Task<List<ProjectDto>> GetProjectsAsync(ConnectionSettings settings) =>
         SendAsync<ProjectListResponse>(settings, HttpMethod.Get, "api/projects")
@@ -160,4 +167,9 @@ public sealed class ChatApiClient
 
         return payload;
     }
+}
+
+public sealed class BillingResponse
+{
+    public BillingSummaryDto Billing { get; set; } = new();
 }
