@@ -434,9 +434,10 @@
 
                     <ListBox x:Name="MessagesListBox"
                              Margin="0,18,0,0"
-                             Padding="0,0,10,0"
+                             Padding="0,0,10,18"
                              ItemsSource="{Binding Messages}"
                              BorderThickness="0"
+                             ScrollViewer.CanContentScroll="False"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListBox.ItemTemplate>

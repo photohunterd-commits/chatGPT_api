@@ -2,6 +2,7 @@ using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using ChatGptApi.Desktop.Dialogs;
 using ChatGptApi.Desktop.Services;
@@ -187,8 +188,37 @@ public partial class MainWindow : Window
                 return;
             }
 
+            MessagesListBox.UpdateLayout();
+
+            if (FindDescendant<ScrollViewer>(MessagesListBox) is { } scrollViewer)
+            {
+                scrollViewer.ScrollToEnd();
+                return;
+            }
+
             MessagesListBox.ScrollIntoView(MessagesListBox.Items[^1]);
-        }, DispatcherPriority.Background);
+        }, DispatcherPriority.Loaded);
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index += 1)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+
+            if (child is T typedChild)
+            {
+                return typedChild;
+            }
+
+            if (FindDescendant<T>(child) is { } descendant)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
     }
 
     private async Task<bool> RunSafeAsync(Func<Task> action)
