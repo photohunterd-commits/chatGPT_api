@@ -17,6 +17,14 @@ interface ModelMessage {
   content: string;
 }
 
+interface AssistantReplyInput {
+  apiKey?: string;
+  instructions?: string;
+  messages: ModelMessage[];
+  model: string;
+  reasoningEffort: ReasoningEffort;
+}
+
 export interface ModelUsage {
   inputTokens: number;
   cachedInputTokens: number;
@@ -24,13 +32,7 @@ export interface ModelUsage {
   webSearchCalls: number;
 }
 
-export async function generateAssistantReply(input: {
-  apiKey?: string;
-  instructions?: string;
-  messages: ModelMessage[];
-  model: string;
-  reasoningEffort: ReasoningEffort;
-}) {
+export async function generateAssistantReply(input: AssistantReplyInput) {
   const apiKey = input.apiKey?.trim() || config.openAiApiKey?.trim();
 
   if (!apiKey) {
@@ -47,21 +49,68 @@ export async function generateAssistantReply(input: {
   });
 
   try {
-    const response = await client.responses.create({
-      model: input.model,
-      instructions: input.instructions || undefined,
-      max_output_tokens: config.openAiMaxOutputTokens,
-      reasoning: {
-        effort: input.reasoningEffort
-      },
-      input: input.messages.map((message) => ({
-        role: message.role,
-        content: message.content
-      })),
-      store: false
-    });
+    const response = await client.responses.create(buildResponseRequest(input));
 
     const text = response.output_text?.trim() || extractText(response.output);
+
+    if (!text) {
+      throw new ProviderApiError(
+        "The model provider returned an empty response. Check the API key or provider status.",
+        502,
+        "provider_empty_response"
+      );
+    }
+
+    const usage = extractUsage(response.usage, response.output);
+
+    return {
+      text,
+      usage
+    };
+  } catch (error) {
+    throw normalizeProviderError(error);
+  }
+}
+
+export async function streamAssistantReply(
+  input: AssistantReplyInput & {
+    onTextDelta?: (delta: string) => void;
+    signal?: AbortSignal;
+  }
+) {
+  const apiKey = input.apiKey?.trim() || config.openAiApiKey?.trim();
+
+  if (!apiKey) {
+    throw new ProviderApiError(
+      "Model API key is missing. Enter your provider key in the client settings first.",
+      400,
+      "provider_key_missing"
+    );
+  }
+
+  const client = new OpenAI({
+    apiKey,
+    baseURL: config.openAiBaseUrl
+  });
+
+  try {
+    const stream = client.responses.stream(
+      buildResponseRequest(input),
+      input.signal ? { signal: input.signal } : undefined
+    );
+    let streamedText = "";
+
+    for await (const event of stream) {
+      if (event.type !== "response.output_text.delta" || typeof event.delta !== "string" || !event.delta) {
+        continue;
+      }
+
+      streamedText += event.delta;
+      input.onTextDelta?.(event.delta);
+    }
+
+    const response = await stream.finalResponse();
+    const text = response.output_text?.trim() || extractText(response.output) || streamedText.trim();
 
     if (!text) {
       throw new ProviderApiError(
@@ -126,6 +175,22 @@ function normalizeProviderError(error: unknown) {
     502,
     "provider_request_failed"
   );
+}
+
+function buildResponseRequest(input: AssistantReplyInput) {
+  return {
+    model: input.model,
+    instructions: input.instructions || undefined,
+    max_output_tokens: config.openAiMaxOutputTokens,
+    reasoning: {
+      effort: input.reasoningEffort
+    },
+    input: input.messages.map((message) => ({
+      role: message.role,
+      content: message.content
+    })),
+    store: false
+  } as const;
 }
 
 function extractText(output: unknown): string {

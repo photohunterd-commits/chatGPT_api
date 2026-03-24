@@ -13,7 +13,7 @@ import { AppDatabase } from "./database.js";
 import { config } from "./config.js";
 import { AppApiError } from "./errors.js";
 import { isEmailConfigured, sendPasswordResetEmail, sendWelcomeEmail } from "./mailer.js";
-import { ProviderApiError, generateAssistantReply } from "./openai.js";
+import { ProviderApiError, generateAssistantReply, streamAssistantReply } from "./openai.js";
 import { calculateUsageCost, getSupportedModelPricing, resolveModelPricing } from "./pricing.js";
 
 const registerSchema = z.object({
@@ -464,6 +464,166 @@ export function createApp(database = new AppDatabase()) {
     });
   });
 
+  app.post("/api/chats/:chatId/messages/stream", async (request, response) => {
+    const chat = database.getChat(request.user!.id, request.params.chatId);
+
+    if (!chat) {
+      response.status(404).json({
+        error: "Chat not found"
+      });
+      return;
+    }
+
+    const project = database.getProject(request.user!.id, chat.projectId);
+
+    if (!project) {
+      response.status(404).json({
+        error: "Project not found"
+      });
+      return;
+    }
+
+    if (!resolveModelPricing(chat.model)) {
+      throw new AppApiError(
+        `Model pricing is not configured on this server for "${chat.model}".`,
+        400,
+        "model_pricing_missing"
+      );
+    }
+
+    const currentBilling = createBillingResponse(database, request.user!.id);
+
+    if (currentBilling.isLimitReached) {
+      throw new AppApiError(
+        `Monthly budget reached: ${formatRubles(currentBilling.spentRub)} of ${formatRubles(currentBilling.limitRub)} already spent for ${currentBilling.periodMonth}. Wait for the new month or increase MONTHLY_USER_BUDGET_RUB on the server.`,
+        402,
+        "monthly_budget_exceeded"
+      );
+    }
+
+    const payload = messageSchema.parse(request.body);
+    const userMessage = database.addMessage({
+      chatId: chat.id,
+      role: "user",
+      content: payload.content,
+      source: payload.source,
+      metadata: payload.metadata ?? null
+    });
+
+    const history = database
+      .listMessages(request.user!.id, chat.id)
+      .slice(-30)
+      .map((message) => ({
+        role: message.role,
+        content: message.content
+      }));
+
+    const abortController = new AbortController();
+    let connectionClosed = false;
+    const closeHandler = () => {
+      connectionClosed = true;
+      abortController.abort();
+    };
+
+    request.on("close", closeHandler);
+
+    response.status(200);
+    response.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+    response.setHeader("Cache-Control", "no-cache, no-transform");
+    response.setHeader("Connection", "keep-alive");
+    response.flushHeaders?.();
+    writeStreamEvent(response, {
+      type: "start",
+      userMessage
+    });
+
+    try {
+      const assistantReply = await streamAssistantReply({
+        apiKey: request.header("x-provider-api-key") ?? undefined,
+        instructions: project.systemPrompt,
+        messages: history,
+        model: chat.model,
+        reasoningEffort: chat.reasoningEffort,
+        signal: abortController.signal,
+        onTextDelta: (delta) => {
+          if (!connectionClosed) {
+            writeStreamEvent(response, {
+              type: "delta",
+              delta
+            });
+          }
+        }
+      });
+
+      if (connectionClosed) {
+        return;
+      }
+
+      const usageCost = calculateUsageCost(chat.model, assistantReply.usage);
+
+      database.createUsageEvent({
+        userId: request.user!.id,
+        chatId: chat.id,
+        model: chat.model,
+        inputTokens: usageCost.inputTokens,
+        cachedInputTokens: usageCost.cachedInputTokens,
+        outputTokens: usageCost.outputTokens,
+        webSearchCalls: usageCost.webSearchCalls,
+        inputCostRub: usageCost.inputCostRub,
+        cachedInputCostRub: usageCost.cachedInputCostRub,
+        outputCostRub: usageCost.outputCostRub,
+        webSearchCostRub: usageCost.webSearchCostRub,
+        totalCostRub: usageCost.totalCostRub
+      });
+
+      const assistantMessage = database.addMessage({
+        chatId: chat.id,
+        role: "assistant",
+        content: assistantReply.text,
+        source: "openai",
+        metadata: {
+          billing: {
+            cachedInputTokens: usageCost.cachedInputTokens,
+            inputTokens: usageCost.inputTokens,
+            outputTokens: usageCost.outputTokens,
+            totalCostRub: usageCost.totalCostRub,
+            webSearchCalls: usageCost.webSearchCalls
+          },
+          model: usageCost.pricing.label
+        }
+      });
+
+      writeStreamEvent(response, {
+        type: "done",
+        assistantMessage,
+        billing: createBillingResponse(database, request.user!.id)
+      });
+    } catch (error) {
+      if (!connectionClosed) {
+        const normalized = error instanceof ProviderApiError
+          ? error
+          : error instanceof AppApiError
+            ? error
+            : new AppApiError(
+              error instanceof Error ? error.message : "Unexpected server error",
+              500,
+              "stream_request_failed"
+            );
+
+        writeStreamEvent(response, {
+          type: "error",
+          error: normalized.message,
+          code: normalized.code
+        });
+      }
+    } finally {
+      request.off("close", closeHandler);
+      if (!connectionClosed) {
+        response.end();
+      }
+    }
+  });
+
   app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
     if (error instanceof z.ZodError) {
       response.status(400).json({
@@ -535,4 +695,11 @@ function formatRubles(value: number) {
 
 function toMoney(value: number) {
   return Number(value.toFixed(2));
+}
+
+function writeStreamEvent(
+  response: express.Response,
+  event: Record<string, unknown>
+) {
+  response.write(`${JSON.stringify(event)}\n`);
 }

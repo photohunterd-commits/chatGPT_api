@@ -2,7 +2,7 @@
   "name": "codex-project-bridge",
   "displayName": "Codex Project Bridge",
   "description": "A Codex-style chat sidebar for VS Code backed by your private GPT workspace server.",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "publisher": "photohunterd",
   "private": true,
   "license": "MIT",
@@ -24,14 +24,15 @@
     "Other"
   ],
   "activationEvents": [
-    "onView:codexBridge.chat",
+    "onChatParticipant:photohunterd.codexBridge.chat",
     "onCommand:codexBridge.register",
     "onCommand:codexBridge.login",
     "onCommand:codexBridge.logout",
     "onCommand:codexBridge.configureProviderKey",
     "onCommand:codexBridge.refresh",
     "onCommand:codexBridge.newChat",
-    "onCommand:codexBridge.sendSelection"
+    "onCommand:codexBridge.sendSelection",
+    "onCommand:codexBridge.openChat"
   ],
   "main": "./dist/extension.js",
   "scripts": {
@@ -40,25 +41,42 @@
     "package": "npm run build && vsce package --no-yarn --no-dependencies"
   },
   "contributes": {
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "codexBridge",
-          "title": "Codex Bridge",
-          "icon": "assets/codex-bridge.svg"
-        }
-      ]
-    },
-    "views": {
-      "codexBridge": [
-        {
-          "id": "codexBridge.chat",
-          "name": "Codex",
-          "type": "webview"
-        }
-      ]
-    },
+    "chatParticipants": [
+      {
+        "id": "photohunterd.codexBridge.chat",
+        "fullName": "GPT Workspace",
+        "name": "gpt54",
+        "description": "Private GPT workspace on your server",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "help",
+            "description": "Show setup and usage help."
+          },
+          {
+            "name": "login",
+            "description": "Sign in to your GPT Workspace account."
+          },
+          {
+            "name": "register",
+            "description": "Create a new GPT Workspace account."
+          },
+          {
+            "name": "key",
+            "description": "Save or replace your personal model API key."
+          },
+          {
+            "name": "logout",
+            "description": "Sign out from GPT Workspace."
+          }
+        ]
+      }
+    ],
     "commands": [
+      {
+        "command": "codexBridge.openChat",
+        "title": "Codex Bridge: Open Chat"
+      },
       {
         "command": "codexBridge.register",
         "title": "Codex Bridge: Register"
@@ -88,25 +106,6 @@
         "title": "Codex Bridge: Send Selection to Chat"
       }
     ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "codexBridge.newChat",
-          "when": "view == codexBridge.chat",
-          "group": "navigation"
-        },
-        {
-          "command": "codexBridge.refresh",
-          "when": "view == codexBridge.chat",
-          "group": "navigation"
-        },
-        {
-          "command": "codexBridge.configureProviderKey",
-          "when": "view == codexBridge.chat",
-          "group": "navigation"
-        }
-      ]
-    },
     "configuration": {
       "title": "Codex Project Bridge",
       "properties": {
@@ -119,11 +118,6 @@
           "type": "string",
           "default": "",
           "description": "Internal id of the hidden Codex project."
-        },
-        "codexBridge.defaultChatId": {
-          "type": "string",
-          "default": "",
-          "description": "Internal id of the active Codex chat."
         }
       }
     }

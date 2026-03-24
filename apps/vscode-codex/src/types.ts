@@ -79,6 +79,27 @@ export interface MessageSendResponse {
   assistantMessage?: ChatMessage;
 }
 
+export interface MessageStreamStartEvent {
+  type: "start";
+  userMessage?: ChatMessage;
+}
+
+export interface MessageStreamDeltaEvent {
+  type: "delta";
+  delta: string;
+}
+
+export interface MessageStreamDoneEvent {
+  type: "done";
+  billing: BillingSummary;
+  assistantMessage?: ChatMessage;
+}
+
+export type MessageStreamEvent =
+  | MessageStreamStartEvent
+  | MessageStreamDeltaEvent
+  | MessageStreamDoneEvent;
+
 export interface SidebarState {
   hasSession: boolean;
   hasProviderKey: boolean;

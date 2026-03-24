@@ -1,30 +1,33 @@
 import * as vscode from "vscode";
-import { BackendApi, setConfiguration } from "./backendApi.js";
-import { CodexChatProvider, updateStatusBar } from "./homeView.js";
-import { type AuthResponse } from "./types.js";
+import { BackendApi } from "./backendApi.js";
+import {
+  CHAT_PARTICIPANT_ID,
+  CHAT_PARTICIPANT_NAME,
+  configureProviderKeyInteractive,
+  createCodexChatParticipant,
+  logout,
+  openNativeChatSurface,
+  runLoginFlow,
+  runRegisterFlow,
+  startFreshChat,
+  updateStatusBar
+} from "./chatParticipant.js";
 
 export function activate(context: vscode.ExtensionContext) {
   const api = new BackendApi(context);
-  const provider = new CodexChatProvider(context, api);
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
-
   const refreshAll = async () => {
-    await provider.refresh();
     await updateStatusBar(statusBar, api);
   };
 
-  provider.setRefreshHandler(refreshAll);
-  statusBar.command = "workbench.view.extension.codexBridge";
   statusBar.show();
   void refreshAll();
 
+  const participant = createCodexChatParticipant(context, api, refreshAll);
+
   context.subscriptions.push(
     statusBar,
-    vscode.window.registerWebviewViewProvider("codexBridge.chat", provider, {
-      webviewOptions: {
-        retainContextWhenHidden: true
-      }
-    }),
+    participant,
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("codexBridge")) {
         void refreshAll();
@@ -33,61 +36,87 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("codexBridge.refresh", refreshAll),
-    vscode.commands.registerCommand("codexBridge.newChat", () => provider.startNewChat()),
-    vscode.commands.registerCommand("codexBridge.sendSelection", () => provider.sendSelectionToChat()),
-    vscode.commands.registerCommand("codexBridge.logout", async () => {
-      await provider.logout();
-      vscode.window.showInformationMessage("Signed out from Codex.");
-    }),
-    vscode.commands.registerCommand("codexBridge.configureProviderKey", async () => {
-      const apiKey = await vscode.window.showInputBox({
-        title: "Model API key",
-        prompt: "Paste your personal model API key",
-        ignoreFocusOut: true,
-        password: true,
-        validateInput: (value) => value.trim() ? null : "The model API key is required."
-      });
+    vscode.commands.registerCommand("codexBridge.openChat", async () => {
+      const opened = await openNativeChatSurface();
 
-      if (!apiKey) {
+      if (!opened) {
+        vscode.window.showInformationMessage(
+          `Open the Chat view in VS Code and talk to @${CHAT_PARTICIPANT_NAME}.`
+        );
+      }
+    }),
+    vscode.commands.registerCommand("codexBridge.refresh", refreshAll),
+    vscode.commands.registerCommand("codexBridge.newChat", async () => {
+      const started = await startFreshChat();
+
+      if (!started) {
+        vscode.window.showInformationMessage(
+          `Start a new thread in the Chat view and invoke @${CHAT_PARTICIPANT_NAME}.`
+        );
+      }
+    }),
+    vscode.commands.registerCommand("codexBridge.sendSelection", async () => {
+      const opened = await openNativeChatSurface();
+      const editor = vscode.window.activeTextEditor;
+
+      if (!editor) {
+        vscode.window.showWarningMessage("Open a file or code selection before using this command.");
         return;
       }
 
-      await api.storeProviderKey(apiKey.trim());
+      const selection = editor.selection;
+      const selectionText = selection.isEmpty
+        ? editor.document.getText()
+        : editor.document.getText(selection);
+
+      if (!selectionText.trim()) {
+        vscode.window.showWarningMessage("The current editor selection is empty.");
+        return;
+      }
+
+      if (!opened) {
+        vscode.window.showInformationMessage(
+          `Open the Chat view and ask @${CHAT_PARTICIPANT_NAME} about the current code selection.`
+        );
+        return;
+      }
+
+      vscode.window.showInformationMessage(
+        `Chat is open. Attach the current selection or paste it into @${CHAT_PARTICIPANT_NAME}.`
+      );
+    }),
+    vscode.commands.registerCommand("codexBridge.logout", async () => {
+      await logout(api);
+      await refreshAll();
+      vscode.window.showInformationMessage("Signed out from GPT Workspace.");
+    }),
+    vscode.commands.registerCommand("codexBridge.configureProviderKey", async () => {
+      const saved = await withErrorBoundary(() => configureProviderKeyInteractive(api));
+
+      if (!saved) {
+        return;
+      }
+
       await refreshAll();
       vscode.window.showInformationMessage("Model API key stored locally in VS Code.");
     }),
     vscode.commands.registerCommand("codexBridge.login", async () => {
-      const email = await promptForEmail("Sign in");
-      if (!email) return;
-      const password = await promptForPassword("Sign in");
-      if (!password) return;
+      const auth = await withErrorBoundary(() => runLoginFlow(api));
 
-      const auth = await withErrorBoundary(() => api.login(email, password));
-      if (!auth) return;
+      if (!auth) {
+        return;
+      }
 
-      await applyAuthSession(api, auth);
       await refreshAll();
       vscode.window.showInformationMessage(`Signed in as ${auth.user.email}`);
     }),
     vscode.commands.registerCommand("codexBridge.register", async () => {
-      const name = await vscode.window.showInputBox({
-        title: "Create account",
-        prompt: "Display name",
-        ignoreFocusOut: true,
-        validateInput: (value) => value.trim() ? null : "Display name is required."
-      });
-      if (!name) return;
+      const auth = await withErrorBoundary(() => runRegisterFlow(api));
 
-      const email = await promptForEmail("Create account");
-      if (!email) return;
-      const password = await promptForPassword("Create account");
-      if (!password) return;
+      if (!auth) {
+        return;
+      }
 
-      const auth = await withErrorBoundary(() => api.register(name, email, password));
-      if (!auth) return;
-
-      await applyAuthSession(api, auth);
       await refreshAll();
       vscode.window.showInformationMessage(`Signed in as ${auth.user.email}`);
     })
@@ -96,31 +125,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {
   return undefined;
-}
-
-async function applyAuthSession(api: BackendApi, auth: AuthResponse) {
-  await api.storeSession(auth);
-  await setConfiguration("defaultProjectId", "");
-  await setConfiguration("defaultChatId", "");
-}
-
-async function promptForEmail(title: string) {
-  return vscode.window.showInputBox({
-    title,
-    prompt: "Email address",
-    ignoreFocusOut: true,
-    validateInput: (value) => value.includes("@") ? null : "Enter a valid email address."
-  });
-}
-
-async function promptForPassword(title: string) {
-  return vscode.window.showInputBox({
-    title,
-    prompt: "Password",
-    ignoreFocusOut: true,
-    password: true,
-    validateInput: (value) => value.length >= 8 ? null : "Password must contain at least 8 characters."
-  });
 }
 
 function isProviderKeyNotice(message: string) {
@@ -138,12 +142,14 @@ async function withErrorBoundary<T>(action: () => Promise<T>) {
   try {
     return await action();
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unexpected Codex failure.";
+    const message = error instanceof Error ? error.message : "Unexpected GPT Workspace failure.";
+
     if (isProviderKeyNotice(message)) {
       vscode.window.showWarningMessage(message);
     } else {
       vscode.window.showErrorMessage(message);
     }
+
     return undefined;
   }
 }

@@ -4,10 +4,11 @@ import {
   DEFAULT_CODEX_MODEL,
   DEFAULT_CODEX_REASONING,
   type AuthResponse,
+  type BillingSummary,
   type Chat,
   type ChatResponse,
-  type ChatMessage,
   type MessageSendResponse,
+  type MessageStreamEvent,
   type MessageResponse,
   type Project,
   type ProjectResponse,
@@ -97,6 +98,88 @@ export class BackendApi {
     return response.data;
   }
 
+  async *streamMessage(
+    chatId: string,
+    content: string,
+    metadata: Record<string, unknown>,
+    options?: { signal?: AbortSignal }
+  ): AsyncGenerator<MessageStreamEvent, void, void> {
+    const headers = await this.resolveHeaders({
+      includeProviderKey: true
+    });
+    const response = await fetch(`${DEFAULT_BACKEND_URL}/api/chats/${chatId}/messages/stream`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        content,
+        source: "vscode",
+        metadata
+      }),
+      signal: options?.signal
+    });
+
+    if (!response.ok) {
+      throw await this.createFetchError(response);
+    }
+
+    if (!response.body) {
+      throw new Error("The server did not provide a response stream.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+
+        if (!trimmed) {
+          continue;
+        }
+
+        const event = JSON.parse(trimmed) as
+          | MessageStreamEvent
+          | { type: "error"; error?: string; code?: string };
+
+        if (event.type === "error") {
+          throw new Error(event.error || "The server reported a streaming error.");
+        }
+
+        yield event;
+      }
+    }
+
+    const tail = buffer.trim();
+
+    if (!tail) {
+      return;
+    }
+
+    const event = JSON.parse(tail) as
+      | MessageStreamEvent
+      | { type: "error"; error?: string; code?: string };
+
+    if (event.type === "error") {
+      throw new Error(event.error || "The server reported a streaming error.");
+    }
+
+    yield event;
+  }
+
   async getSession() {
     const response = await (await this.client()).get<SessionResponse>("/api/me");
     return response.data;
@@ -121,6 +204,14 @@ export class BackendApi {
   }
 
   private async client(options?: { requireAuth?: boolean; includeProviderKey?: boolean }) {
+    return axios.create({
+      baseURL: DEFAULT_BACKEND_URL,
+      headers: await this.resolveHeaders(options),
+      timeout: 30000
+    });
+  }
+
+  private async resolveHeaders(options?: { requireAuth?: boolean; includeProviderKey?: boolean }) {
     const headers: Record<string, string> = {};
     const requireAuth = options?.requireAuth ?? true;
 
@@ -144,11 +235,23 @@ export class BackendApi {
       headers["X-Provider-Api-Key"] = providerApiKey;
     }
 
-    return axios.create({
-      baseURL: DEFAULT_BACKEND_URL,
-      headers,
-      timeout: 30000
-    });
+    return headers;
+  }
+
+  private async createFetchError(response: Response) {
+    const contentType = response.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      try {
+        const payload = await response.json() as { error?: string };
+        return new Error(payload.error || `The server responded with ${response.status}.`);
+      } catch {
+        return new Error(`The server responded with ${response.status}.`);
+      }
+    }
+
+    const text = (await response.text()).trim();
+    return new Error(text || `The server responded with ${response.status}.`);
   }
 }
 
