@@ -127,7 +127,7 @@ npm.cmd run package:vscode
 Готовый файл:
 
 ```text
-apps/vscode-codex/codex-project-bridge-0.1.0.vsix
+apps/vscode-codex/codex-project-bridge-<версия>.vsix
 ```
 
 Установка в VS Code:
@@ -135,7 +135,7 @@ apps/vscode-codex/codex-project-bridge-0.1.0.vsix
 1. Откройте VS Code.
 2. Перейдите в Extensions.
 3. Выберите `Install from VSIX...`.
-4. Укажите файл `codex-project-bridge-0.1.0.vsix`.
+4. Укажите файл `codex-project-bridge-<версия>.vsix`.
 
 ## Автоматическая сборка релиза на GitHub
 
@@ -160,8 +160,8 @@ Workflow находится в:
 Пример публикации релиза:
 
 ```powershell
-git tag v0.1.0
-git push origin v0.1.0
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 ## Основные переменные окружения

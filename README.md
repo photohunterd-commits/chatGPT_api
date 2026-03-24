@@ -56,7 +56,7 @@ Useful build commands:
 
 The release workflow is in [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
-- Pushing a tag like `v0.1.0` builds the Windows desktop publish output.
+- Pushing a tag like `vX.Y.Z` builds the Windows desktop publish output.
 - The workflow packages the VS Code extension as `.vsix`.
 - The workflow compiles an Inno Setup installer.
 - GitHub Release assets are published automatically for tagged builds.
