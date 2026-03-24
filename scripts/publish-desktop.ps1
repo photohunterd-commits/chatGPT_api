@@ -13,7 +13,7 @@ $output = Join-Path $repoRoot "publish/windows-client"
 & $dotnet publish $project `
     -c $Configuration `
     -r $Runtime `
-    --self-contained false `
+    --self-contained true `
     -p:PublishSingleFile=true `
     -o $output
 
