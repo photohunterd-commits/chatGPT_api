@@ -1,6 +1,8 @@
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using ChatGptApi.Desktop.Dialogs;
 using ChatGptApi.Desktop.Services;
 using ChatGptApi.Desktop.ViewModels;
@@ -16,6 +18,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _viewModel = new MainViewModel(new ChatApiClient(), new ConnectionSettingsStore());
         DataContext = _viewModel;
+        _viewModel.Messages.CollectionChanged += OnMessagesCollectionChanged;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -165,6 +168,27 @@ public partial class MainWindow : Window
             _viewModel.ProviderApiKey = dialog.ProviderApiKey;
             await RunSafeAsync(_viewModel.SaveSettingsAsync);
         }
+    }
+
+    private void OnMessagesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action is NotifyCollectionChangedAction.Add or NotifyCollectionChangedAction.Reset)
+        {
+            ScrollMessagesToEnd();
+        }
+    }
+
+    private void ScrollMessagesToEnd()
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (MessagesListBox.Items.Count == 0)
+            {
+                return;
+            }
+
+            MessagesListBox.ScrollIntoView(MessagesListBox.Items[^1]);
+        }, DispatcherPriority.Background);
     }
 
     private async Task<bool> RunSafeAsync(Func<Task> action)

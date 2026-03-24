@@ -185,19 +185,19 @@
                              SelectionChanged="OnProjectSelectionChanged">
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="{x:Type local:ProjectItem}">
-                                <Border Margin="0,0,0,10"
-                                        Padding="16,14">
+                                <Border Margin="0,0,0,8"
+                                        Padding="12,11">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Setter Property="Background" Value="{StaticResource PanelAltBrush}" />
                                             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
                                             <Setter Property="BorderThickness" Value="1" />
-                                            <Setter Property="CornerRadius" Value="20" />
+                                            <Setter Property="CornerRadius" Value="18" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}"
                                                              Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource AccentMutedBrush}" />
-                                                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                    <Setter Property="Background" Value="#1B242D" />
+                                                    <Setter Property="BorderBrush" Value="#2C6B5B" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -209,26 +209,28 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
 
-                                        <Border Width="38"
-                                                Height="38"
+                                        <Border Width="34"
+                                                Height="34"
                                                 Margin="0,0,12,0"
                                                 Background="#102A23"
-                                                CornerRadius="14"
-                                                Padding="8">
+                                                CornerRadius="12"
+                                                Padding="7">
                                             <Path Style="{StaticResource AccentVectorIconStyle}"
                                                   Data="{StaticResource ProjectIconGeometry}" />
                                         </Border>
 
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock FontSize="16"
+                                            <TextBlock FontSize="15"
                                                        FontWeight="SemiBold"
                                                        Text="{Binding Name}" />
-                                            <TextBlock Margin="0,6,0,0"
+                                            <TextBlock Margin="0,4,0,0"
                                                        Foreground="{StaticResource SubtleTextBrush}"
-                                                       TextWrapping="Wrap"
+                                                       TextWrapping="NoWrap"
+                                                       TextTrimming="CharacterEllipsis"
                                                        Text="{Binding Description}" />
-                                            <TextBlock Margin="0,10,0,0"
+                                            <TextBlock Margin="0,8,0,0"
                                                        Foreground="{StaticResource AccentBrush}"
+                                                       FontSize="12"
                                                        FontWeight="SemiBold"
                                                        Text="{Binding Footer}" />
                                         </StackPanel>
@@ -279,19 +281,19 @@
                              SelectionChanged="OnChatSelectionChanged">
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="{x:Type local:ChatItem}">
-                                <Border Margin="0,0,0,10"
-                                        Padding="16,14">
+                                <Border Margin="0,0,0,8"
+                                        Padding="12,11">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Setter Property="Background" Value="{StaticResource PanelAltBrush}" />
                                             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
                                             <Setter Property="BorderThickness" Value="1" />
-                                            <Setter Property="CornerRadius" Value="20" />
+                                            <Setter Property="CornerRadius" Value="18" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}"
                                                              Value="True">
-                                                    <Setter Property="Background" Value="#15242E" />
-                                                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                    <Setter Property="Background" Value="#1A2430" />
+                                                    <Setter Property="BorderBrush" Value="#2B6177" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -303,28 +305,32 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
 
-                                        <Border Width="38"
-                                                Height="38"
+                                        <Border Width="34"
+                                                Height="34"
                                                 Margin="0,0,12,0"
                                                 Background="#122230"
-                                                CornerRadius="14"
-                                                Padding="8">
+                                                CornerRadius="12"
+                                                Padding="7">
                                             <Path Style="{StaticResource AccentVectorIconStyle}"
                                                   Data="{StaticResource ChatIconGeometry}" />
                                         </Border>
 
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock FontSize="16"
+                                            <TextBlock FontSize="15"
                                                        FontWeight="SemiBold"
                                                        Text="{Binding Title}" />
-                                            <TextBlock Margin="0,6,0,0"
+                                            <TextBlock Margin="0,4,0,0"
                                                        Foreground="{StaticResource SubtleTextBrush}"
+                                                       TextWrapping="NoWrap"
+                                                       TextTrimming="CharacterEllipsis"
                                                        Text="{Binding Model}" />
-                                            <TextBlock Margin="0,6,0,0"
+                                            <TextBlock Margin="0,4,0,0"
                                                        Foreground="{StaticResource MutedTextBrush}"
+                                                       FontSize="12"
                                                        Text="{Binding ReasoningEffort}" />
-                                            <TextBlock Margin="0,10,0,0"
+                                            <TextBlock Margin="0,8,0,0"
                                                        Foreground="{StaticResource AccentBrush}"
+                                                       FontSize="12"
                                                        FontWeight="SemiBold"
                                                        Text="{Binding Footer}" />
                                         </StackPanel>
@@ -426,13 +432,17 @@
                         </Grid>
                     </Border>
 
-                    <ScrollViewer Margin="0,18,0,0"
-                                  VerticalScrollBarVisibility="Auto">
-                        <ListBox ItemsSource="{Binding Messages}">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate DataType="{x:Type local:MessageItem}">
-                                    <Border MaxWidth="760"
-                                            Margin="0,0,0,14"
+                    <ListBox x:Name="MessagesListBox"
+                             Margin="0,18,0,0"
+                             Padding="0,0,10,0"
+                             ItemsSource="{Binding Messages}"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:MessageItem}">
+                                <Grid Margin="0,0,0,14">
+                                    <Border MaxWidth="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}"
                                             Padding="18"
                                             HorizontalAlignment="{Binding BubbleAlignment}"
                                             Background="{Binding BubbleBackground}"
@@ -445,7 +455,7 @@
                                                        Text="{Binding Header}" />
                                             <TextBlock Margin="0,10,0,0"
                                                        Foreground="{Binding Foreground}"
-                                                       TextWrapping="Wrap"
+                                                       TextWrapping="WrapWithOverflow"
                                                        Text="{Binding Content}" />
                                             <TextBlock Margin="0,12,0,0"
                                                        FontSize="12"
@@ -454,10 +464,10 @@
                                                        Text="{Binding Timestamp}" />
                                         </StackPanel>
                                     </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </ScrollViewer>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </DockPanel>
             </Border>
         </Grid>
