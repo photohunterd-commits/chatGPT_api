@@ -11,9 +11,18 @@ Codex Project Bridge connects VS Code to the GPT-5.4 workspace backend.
 - Create projects and chats without leaving VS Code.
 - Send the current selection or the whole file into the active chat with metadata.
 
+## Install
+
+The easiest path is GitHub Releases:
+
+1. Download `codex-project-bridge-<version>.vsix` from the latest release.
+2. In VS Code, run `Extensions: Install from VSIX...`.
+3. Sign in inside the extension.
+4. Save a personal provider API key inside the extension.
+
 ## Settings
 
-- `codexBridge.baseUrl` - backend URL, for example `http://127.0.0.1:3030`
+- `codexBridge.baseUrl` - backend URL, default `http://62.109.2.121:3030`
 - `codexBridge.userEmail` - last signed-in email
 - `codexBridge.defaultProjectId` - active project id
 - `codexBridge.defaultChatId` - active chat id

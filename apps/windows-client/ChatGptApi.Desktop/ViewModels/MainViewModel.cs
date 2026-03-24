@@ -14,7 +14,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly ConnectionSettingsStore _settingsStore;
 
     private string _authToken = string.Empty;
-    private string _baseUrl = "http://127.0.0.1:3030";
+    private string _baseUrl = "http://62.109.2.121:3030";
     private string _currentUserEmail = string.Empty;
     private string _currentUserName = string.Empty;
     private string _draftMessage = string.Empty;

@@ -161,7 +161,7 @@
       "properties": {
         "codexBridge.baseUrl": {
           "type": "string",
-          "default": "http://127.0.0.1:3030",
+          "default": "http://62.109.2.121:3030",
           "description": "Base URL of the GPT-5.4 chat backend."
         },
         "codexBridge.userEmail": {

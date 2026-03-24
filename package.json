@@ -15,6 +15,7 @@
     "dev:server": "npm run dev --workspace apps/server",
     "package:vscode": "npm run package --workspace apps/vscode-codex",
     "publish:desktop": "powershell -ExecutionPolicy Bypass -File scripts/publish-desktop.ps1",
+    "build:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
     "deploy:server": "node scripts/deploy-server.mjs"
   },
   "repository": {

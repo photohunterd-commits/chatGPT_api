@@ -1,12 +1,41 @@
 # GPT-5.4 Workspace
 
-Русская инструкция по запуску, деплою и использованию проекта.
+Русская инструкция по установке, релизам, локальной сборке и деплою проекта.
 
-## Что входит в репозиторий
+## Самый простой путь для пользователя
+
+Пользователю больше не нужно собирать приложение вручную.
+
+1. Откройте `Releases` в этом репозитории.
+2. Скачайте установщик `gpt54-workspace-setup-<версия>.exe`.
+3. Установите и запустите приложение.
+4. Зарегистрируйтесь или войдите уже внутри приложения.
+5. Введите свой personal API key от провайдера модели уже внутри приложения.
+
+Desktop-приложение уже преднастроено на рабочий backend:
+
+```text
+http://62.109.2.121:3030
+```
+
+То есть пользователю не нужно вручную прописывать адрес сервера в базовом сценарии.
+
+Если нужен VS Code:
+
+1. Скачайте из того же релиза файл `codex-project-bridge-<версия>.vsix`.
+2. В VS Code выберите `Extensions: Install from VSIX...`.
+3. Войдите в аккаунт внутри расширения.
+4. Сохраните свой personal API key внутри расширения.
+
+Если ключ невалидный, закончился баланс, превышена квота или провайдер не отвечает, и desktop-приложение, и расширение показывают понятное уведомление.
+
+## Что находится в репозитории
 
 1. `apps/server` - backend на Node.js/TypeScript с SQLite, регистрацией пользователей и приватными чатами.
 2. `apps/windows-client/ChatGptApi.Desktop` - нативное Windows-приложение на WPF.
 3. `apps/vscode-codex` - расширение VS Code для работы с проектами и чатами через Codex workflow.
+4. `scripts` - скрипты публикации desktop-приложения, сборки установщика и деплоя сервера.
+5. `.github/workflows/release.yml` - GitHub Actions workflow для сборки релизных артефактов.
 
 ## Как устроена безопасность
 
@@ -17,25 +46,17 @@
 - Backend принимает ключ провайдера в заголовке запроса, поэтому общий публичный ключ для всех пользователей не нужен.
 - Если ключ невалидный, закончился баланс или превышена квота, backend возвращает понятную ошибку.
 
-## Требования
-
-- Windows 10/11 для desktop-клиента
-- Node.js 20+
-- npm 10+
-- .NET 8 SDK для локальной сборки desktop-клиента
-- Ubuntu + Docker Compose для сервера
-
-## Быстрый локальный запуск
+## Локальный запуск для разработки
 
 1. Скопируйте `.env.example` в `.env`.
-2. Укажите в `.env` длинный случайный `JWT_SECRET`.
-3. Если используете AITUNNEL-ключи вида `sk-aitunnel-...`, укажите:
+2. Укажите длинный случайный `JWT_SECRET`.
+3. Если используете AITUNNEL-ключи вида `sk-aitunnel-...`, задайте:
 
 ```env
 OPENAI_BASE_URL=https://api.aitunnel.ru/v1
 ```
 
-4. Если каждый пользователь должен вводить свой ключ сам, оставьте:
+4. Если каждый пользователь вводит свой ключ сам, оставьте:
 
 ```env
 OPENAI_API_KEY=
@@ -68,29 +89,26 @@ GET /health
 }
 ```
 
-## Сборка Windows-приложения
+## Сборка desktop-приложения и установщика
 
-Команда сборки готового self-contained `.exe`:
+Публикация self-contained desktop-клиента:
 
 ```powershell
 npm.cmd run publish:desktop
 ```
 
-Готовый файл появится в папке:
+Сборка установщика Inno Setup:
 
-```text
-publish/windows-client/ChatGptApi.Desktop.exe
+```powershell
+npm.cmd run build:installer
 ```
 
-Что делает приложение:
+На выходе получаются:
 
-- позволяет зарегистрировать пользователя
-- позволяет войти в аккаунт
-- хранит токен входа и model API key локально на текущем Windows-профиле
-- показывает проекты
-- показывает чаты внутри проекта
-- отправляет сообщения в `gpt-5.4`
-- показывает предупреждение, если ключ не работает или закончился баланс
+- `publish/windows-client/` - опубликованные файлы desktop-приложения
+- `publish/installer/` - готовый `.exe`-установщик
+
+Для локальной сборки установщика нужен `Inno Setup 6`.
 
 ## Сборка и установка расширения VS Code
 
@@ -103,7 +121,7 @@ npm.cmd run build:vscode
 Упаковка `.vsix`:
 
 ```powershell
-npm.cmd run package --workspace apps/vscode-codex
+npm.cmd run package:vscode
 ```
 
 Готовый файл:
@@ -119,13 +137,32 @@ apps/vscode-codex/codex-project-bridge-0.1.0.vsix
 3. Выберите `Install from VSIX...`.
 4. Укажите файл `codex-project-bridge-0.1.0.vsix`.
 
-После установки:
+## Автоматическая сборка релиза на GitHub
 
-1. Укажите `codexBridge.baseUrl`.
-2. Зарегистрируйтесь или войдите.
-3. Сохраните personal model API key через команду `Codex Bridge: Configure Model API Key`.
-4. Выберите проект и чат.
-5. Отправляйте выделенный код или файл в чат.
+Workflow находится в:
+
+```text
+.github/workflows/release.yml
+```
+
+Что делает workflow:
+
+1. Собирает desktop-приложение.
+2. Упаковывает расширение VS Code в `.vsix`.
+3. Собирает Windows-установщик через Inno Setup.
+4. Публикует GitHub Release при пуше тега вида `vX.Y.Z`.
+
+Ожидаемые артефакты релиза:
+
+- `gpt54-workspace-setup-<версия>.exe`
+- `codex-project-bridge-<версия>.vsix`
+
+Пример публикации релиза:
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
 
 ## Основные переменные окружения
 
@@ -150,7 +187,7 @@ DATA_DIR=./data
 - `OPENAI_MODEL` - модель, сейчас `gpt-5.4`
 - `OPENAI_REASONING_EFFORT` - `low`, `medium`, `high`, `xhigh`
 - `JWT_SECRET` - секрет для пользовательских сессий
-- `DATA_DIR` - папка с SQLite базой
+- `DATA_DIR` - папка с SQLite-базой
 
 ## Деплой на Ubuntu-сервер
 
@@ -196,34 +233,6 @@ npm.cmd run deploy:server
 - `DEPLOY_PASSWORD`
 - `DEPLOY_HOST_KEY`
 
-## Как пользователю начать работу
-
-### В desktop-клиенте
-
-1. Запустить приложение.
-2. Указать `Backend URL`.
-3. Ввести personal model API key.
-4. Нажать `Register` или `Sign In`.
-5. Создать проект.
-6. Создать чат.
-7. Отправить сообщение.
-
-### В VS Code
-
-1. Установить расширение.
-2. Указать `codexBridge.baseUrl`.
-3. Выполнить `Codex Bridge: Register` или `Codex Bridge: Sign In`.
-4. Выполнить `Codex Bridge: Configure Model API Key`.
-5. Создать или выбрать проект.
-6. Создать или выбрать чат.
-7. Отправлять код в чат командой `Codex Bridge: Send Selection to Chat`.
-
-## Где лежат данные
-
-- SQLite база хранится в папке `data`
-- пользовательские проекты и чаты лежат в этой базе
-- токен входа и ключ модели не коммитятся в git
-
 ## Что уже проверено
 
 - регистрация пользователя работает
@@ -232,9 +241,5 @@ npm.cmd run deploy:server
 - backend отвечает по health endpoint
 - запросы к `gpt-5.4` проходят через OpenAI-compatible Responses API
 - desktop-приложение собирается
-- VS Code расширение собирается и упаковывается
-
-## Ссылки
-
-- OpenAI Models: https://developers.openai.com/api/docs/models
-- OpenAI Quickstart: https://developers.openai.com/api/docs/quickstart
+- расширение VS Code собирается и упаковывается
+- release workflow готовит артефакты для установщика и VSIX
