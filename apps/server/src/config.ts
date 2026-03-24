@@ -4,12 +4,15 @@ import { z } from "zod";
 
 dotenv.config();
 
-const envSchema = z.object({
-  OPENAI_API_KEY: z
+const optionalEnvString = () =>
+  z
     .string()
     .trim()
     .optional()
-    .transform((value) => (value ? value : undefined)),
+    .transform((value) => (value ? value : undefined));
+
+const envSchema = z.object({
+  OPENAI_API_KEY: optionalEnvString(),
   OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
   OPENAI_MODEL: z.string().default("gpt-5.4"),
   OPENAI_REASONING_EFFORT: z.enum(["low", "medium", "high", "xhigh"]).default("medium"),
@@ -18,15 +21,15 @@ const envSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
   CORS_ORIGIN: z.string().default("*"),
   DATA_DIR: z.string().default("./data"),
-  SMTP_HOST: z.string().trim().min(1).optional(),
+  SMTP_HOST: optionalEnvString(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
   SMTP_SECURE: z
     .union([z.literal("true"), z.literal("false"), z.literal("1"), z.literal("0")])
     .optional()
     .transform((value) => value === "true" || value === "1"),
-  SMTP_USER: z.string().trim().min(1).optional(),
-  SMTP_PASSWORD: z.string().min(1).optional(),
-  SMTP_FROM: z.string().trim().min(1).optional(),
+  SMTP_USER: optionalEnvString(),
+  SMTP_PASSWORD: optionalEnvString(),
+  SMTP_FROM: optionalEnvString(),
   PASSWORD_RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(30)
 });
 
