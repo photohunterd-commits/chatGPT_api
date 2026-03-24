@@ -17,6 +17,36 @@
         <SolidColorBrush x:Key="MutedTextBrush" Color="#6F7C89" />
         <SolidColorBrush x:Key="WarningBrush" Color="#F5C06A" />
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Geometry x:Key="ProjectIconGeometry">F1 M4,8 C4,6.89543 4.89543,6 6,6 L10.6,6 L12.2,8 L18,8 C19.1046,8 20,8.89543 20,10 L20,17 C20,18.1046 19.1046,19 18,19 L6,19 C4.89543,19 4,18.1046 4,17 Z</Geometry>
+        <Geometry x:Key="ChatIconGeometry">F1 M6,5 L18,5 C19.1046,5 20,5.89543 20,7 L20,14 C20,15.1046 19.1046,16 18,16 L11,16 L7,19.5 L7,16 L6,16 C4.89543,16 4,15.1046 4,14 L4,7 C4,5.89543 4.89543,5 6,5 Z</Geometry>
+        <Geometry x:Key="UserIconGeometry">F1 M12,12 C14.7614,12 17,9.76142 17,7 C17,4.23858 14.7614,2 12,2 C9.23858,2 7,4.23858 7,7 C7,9.76142 9.23858,12 12,12 M4.5,21 C5.44698,17.5204 8.39532,15 12,15 C15.6047,15 18.553,17.5204 19.5,21</Geometry>
+        <Geometry x:Key="BudgetIconGeometry">F1 M4,7 C4,5.34315 7.58172,4 12,4 C16.4183,4 20,5.34315 20,7 C20,8.65685 16.4183,10 12,10 C7.58172,10 4,8.65685 4,7 Z M4,12 C4,13.6569 7.58172,15 12,15 C16.4183,15 20,13.6569 20,12 M4,17 C4,18.6569 7.58172,20 12,20 C16.4183,20 20,18.6569 20,17</Geometry>
+        <Geometry x:Key="SettingsIconGeometry">F1 M12,8.25 C9.92893,8.25 8.25,9.92893 8.25,12 C8.25,14.0711 9.92893,15.75 12,15.75 C14.0711,15.75 15.75,14.0711 15.75,12 C15.75,9.92893 14.0711,8.25 12,8.25 M12,3.5 L13.05,5.65 C13.4218,5.74729 13.7803,5.88636 14.118,6.063 L16.35,5.35 L18.1,7.1 L17.387,9.332 C17.5636,9.66974 17.7027,10.0282 17.8,10.4 L19.95,11.45 L19.95,12.55 L17.8,13.6 C17.7027,13.9718 17.5636,14.3303 17.387,14.668 L18.1,16.9 L16.35,18.65 L14.118,17.937 C13.7803,18.1136 13.4218,18.2527 13.05,18.35 L12,20.5 L10.9,20.5 L9.85,18.35 C9.47821,18.2527 9.11974,18.1136 8.782,17.937 L6.55,18.65 L4.8,16.9 L5.513,14.668 C5.33636,14.3303 5.19729,13.9718 5.1,13.6 L2.95,12.55 L2.95,11.45 L5.1,10.4 C5.19729,10.0282 5.33636,9.66974 5.513,9.332 L4.8,7.1 L6.55,5.35 L8.782,6.063 C9.11974,5.88636 9.47821,5.74729 9.85,5.65 L10.9,3.5 Z</Geometry>
+        <Geometry x:Key="RefreshIconGeometry">F1 M20,6 L20,12 L14,12 M19,13 C18.3807,16.9923 14.9263,20 10.75,20 C6.13462,20 2.25,16.1387 2.25,11.5 C2.25,6.86129 6.13462,3 10.75,3 C13.8885,3 16.657,4.76213 18.073,7.371</Geometry>
+        <Geometry x:Key="SendIconGeometry">F1 M3,11.5 L21,3 L16,21 L11.4,13.6 Z M11.4,13.6 L21,3</Geometry>
+        <Geometry x:Key="WarningIconGeometry">F1 M12,4 L20,19 L4,19 Z M12,9 L12,13.2 M12,16.2 L12,16.4</Geometry>
+        <Geometry x:Key="PlusIconGeometry">F1 M12,5 L12,19 M5,12 L19,12</Geometry>
+        <Style x:Key="VectorIconStyle" TargetType="Path">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="StrokeThickness" Value="1.8" />
+            <Setter Property="Stroke" Value="{StaticResource SubtleTextBrush}" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="AccentVectorIconStyle"
+               TargetType="Path"
+               BasedOn="{StaticResource VectorIconStyle}">
+            <Setter Property="Stroke" Value="{StaticResource AccentBrush}" />
+        </Style>
+        <Style x:Key="WarningVectorIconStyle"
+               TargetType="Path"
+               BasedOn="{StaticResource VectorIconStyle}">
+            <Setter Property="Stroke" Value="{StaticResource WarningBrush}" />
+        </Style>
 
         <Style TargetType="Window">
             <Setter Property="Background" Value="{StaticResource WindowBackgroundBrush}" />

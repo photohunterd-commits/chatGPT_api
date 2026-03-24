@@ -122,15 +122,11 @@ public partial class MainWindow : Window
 
     private async void OnCreateChatClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new ChatDialog
+        await RunSafeAsync(() =>
         {
-            Owner = this
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            await RunSafeAsync(() => _viewModel.CreateChatAsync(dialog.ChatTitle));
-        }
+            _viewModel.StartNewChat();
+            return Task.CompletedTask;
+        });
     }
 
     private async void OnSendMessageClick(object sender, RoutedEventArgs e)

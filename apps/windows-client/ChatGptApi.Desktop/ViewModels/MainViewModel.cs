@@ -11,6 +11,8 @@ namespace ChatGptApi.Desktop.ViewModels;
 
 public sealed class MainViewModel : ObservableObject
 {
+    private const string AutoProjectDescription = "Optional folder created automatically for standalone chats.";
+    private const string AutoProjectName = "General";
     private readonly ChatApiClient _apiClient;
     private readonly ConnectionSettingsStore _settingsStore;
     private static readonly Brush BillingNeutralBrush = new SolidColorBrush(Color.FromRgb(148, 168, 189));
@@ -94,15 +96,23 @@ public sealed class MainViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(SelectedChatTitle));
                 OnPropertyChanged(nameof(SelectedChatSubtitle));
+                OnPropertyChanged(nameof(ComposerHintText));
+                OnPropertyChanged(nameof(SendButtonText));
             }
         }
     }
 
-    public string SelectedChatTitle => SelectedChat?.Title ?? "Select a chat to start talking";
+    public string SelectedChatTitle => SelectedChat?.Title ?? "Start a new chat";
 
     public string SelectedChatSubtitle => SelectedChat is null
-        ? "Projects and chats stay private for the signed-in user."
+        ? "Projects are optional folders. Type the first message below and the app will create a chat automatically."
         : $"{SelectedChat.Model} / {SelectedChat.ReasoningEffort}";
+
+    public string ComposerHintText => SelectedChat is null
+        ? "Start typing. Press Ctrl+Enter to send. The first message will create a chat automatically."
+        : "Write a message. Press Ctrl+Enter to send.";
+
+    public string SendButtonText => SelectedChat is null ? "Start Chat" : "Send";
 
     public string BillingChipText => _billing is null
         ? "Monthly spend: not loaded yet"
@@ -260,7 +270,7 @@ public sealed class MainViewModel : ObservableObject
             await LoadChatsForSelectedProjectAsync(selectedChatId);
 
             StatusMessage = Projects.Count == 0
-                ? "No projects yet. Create the first private project to begin."
+                ? "No chats yet. Start typing below or use New to create one."
                 : $"Loaded {Projects.Count} private project(s).";
         }
         catch (InvalidOperationException exception) when (IsAuthenticationError(exception.Message))
@@ -323,26 +333,26 @@ public sealed class MainViewModel : ObservableObject
     public async Task CreateChatAsync(string title)
     {
         EnsureAuthenticated();
-
-        if (SelectedProject is null)
-        {
-            throw new InvalidOperationException("Select a project before creating a chat.");
-        }
-
-        var chat = await _apiClient.CreateChatAsync(CurrentSettings(), SelectedProject.Id, title);
+        var project = await EnsureProjectForChatAsync();
+        var chat = await _apiClient.CreateChatAsync(CurrentSettings(), project.Id, title);
         await LoadChatsForSelectedProjectAsync(chat.Id);
         StatusMessage = $"Created chat: {chat.Title}";
+    }
+
+    public void StartNewChat()
+    {
+        EnsureAuthenticated();
+        SelectedChat = null;
+        Messages.Clear();
+        StatusMessage = SelectedProject is null
+            ? "Write the first message below. The app will create a new chat automatically."
+            : $"Write the first message below. A new chat will be created inside {SelectedProject.Name}.";
     }
 
     public async Task SendMessageAsync()
     {
         EnsureAuthenticated();
         EnsureProviderApiKey();
-
-        if (SelectedChat is null)
-        {
-            throw new InvalidOperationException("Select a chat before sending a message.");
-        }
 
         var content = DraftMessage.Trim();
 
@@ -351,7 +361,9 @@ public sealed class MainViewModel : ObservableObject
             throw new InvalidOperationException("Type a message before sending.");
         }
 
-        var response = await _apiClient.SendMessageAsync(CurrentSettings(), SelectedChat.Id, content);
+        var chat = await EnsureChatForMessageAsync(content);
+
+        var response = await _apiClient.SendMessageAsync(CurrentSettings(), chat.Id, content);
         DraftMessage = string.Empty;
         ApplyBilling(response.Billing);
 
@@ -389,6 +401,52 @@ public sealed class MainViewModel : ObservableObject
     private async Task PersistSettingsAsync()
     {
         await _settingsStore.SaveAsync(CurrentSettings());
+    }
+
+    private async Task<ProjectItem> EnsureProjectForChatAsync()
+    {
+        if (SelectedProject is not null)
+        {
+            return SelectedProject;
+        }
+
+        if (Projects.Count > 0)
+        {
+            SelectedProject = Projects[0];
+            return SelectedProject;
+        }
+
+        var project = await _apiClient.CreateProjectAsync(CurrentSettings(), new CreateProjectRequest
+        {
+            Name = AutoProjectName,
+            Description = AutoProjectDescription
+        });
+
+        await ReloadWorkspaceAsync();
+        SelectedProject = Projects.FirstOrDefault(item => item.Id == project.Id)
+            ?? Projects.FirstOrDefault();
+
+        if (SelectedProject is null)
+        {
+            throw new InvalidOperationException("Unable to create the default project for the first chat.");
+        }
+
+        return SelectedProject;
+    }
+
+    private async Task<ChatItem> EnsureChatForMessageAsync(string content)
+    {
+        if (SelectedChat is not null)
+        {
+            return SelectedChat;
+        }
+
+        var project = await EnsureProjectForChatAsync();
+        var chat = await _apiClient.CreateChatAsync(CurrentSettings(), project.Id, CreateAutomaticChatTitle(content));
+        await LoadChatsForSelectedProjectAsync(chat.Id);
+
+        return SelectedChat
+            ?? throw new InvalidOperationException("Unable to create the first chat automatically.");
     }
 
     private ConnectionSettings CurrentSettings() => new()
@@ -459,6 +517,22 @@ public sealed class MainViewModel : ObservableObject
     private static string FormatRubles(double value)
     {
         return $"{value.ToString("0.00", CultureInfo.InvariantCulture)} RUB";
+    }
+
+    private static string CreateAutomaticChatTitle(string content)
+    {
+        var normalized = string.Join(" ", content
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Trim();
+
+        if (normalized.Length == 0)
+        {
+            return "New chat";
+        }
+
+        return normalized.Length <= 44
+            ? normalized
+            : $"{normalized[..41].TrimEnd()}...";
     }
 }
 

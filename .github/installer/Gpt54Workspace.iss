@@ -28,6 +28,7 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\{#AppExeName}
+SetupIconFile=..\..\apps\windows-client\ChatGptApi.Desktop\Assets\AppIcon.ico
 LicenseFile=..\..\LICENSE
 
 [Languages]

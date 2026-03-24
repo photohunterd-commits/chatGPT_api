@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Create Chat"
+        Icon="/Assets/AppIcon.png"
         Width="500"
         Height="300"
         WindowStartupLocation="CenterOwner"
@@ -25,13 +26,10 @@
                     <Border Width="44"
                             Height="44"
                             Background="{StaticResource AccentMutedBrush}"
-                            CornerRadius="14">
-                        <Viewbox Stretch="Uniform">
-                            <TextBlock Style="{StaticResource IconTextStyle}"
-                                       FontSize="22"
-                                       Foreground="{StaticResource AccentBrush}"
-                                       Text="&#xE8BD;" />
-                        </Viewbox>
+                            CornerRadius="14"
+                            Padding="10">
+                        <Path Style="{StaticResource AccentVectorIconStyle}"
+                              Data="{StaticResource ChatIconGeometry}" />
                     </Border>
 
                     <StackPanel Margin="14,0,0,0"
@@ -41,7 +39,7 @@
                                    Text="New Chat" />
                         <TextBlock Margin="0,6,0,0"
                                    Foreground="{StaticResource SubtleTextBrush}"
-                                   Text="Start a focused conversation inside the selected project." />
+                                   Text="Start a chat right away. If no project exists yet, the app can create the first folder automatically." />
                     </StackPanel>
                 </StackPanel>
             </StackPanel>
@@ -64,12 +62,11 @@
                     BorderThickness="1"
                     CornerRadius="16">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Style="{StaticResource IconTextStyle}"
-                               Foreground="{StaticResource AccentBrush}"
-                               Text="&#xE946;" />
+                    <Path Style="{StaticResource AccentVectorIconStyle}"
+                          Data="{StaticResource ChatIconGeometry}" />
                     <TextBlock Margin="10,0,0,0"
                                Foreground="{StaticResource SubtleTextBrush}"
-                               Text="The server will use the project's default model and reasoning settings." />
+                               Text="Chats are the main work unit. Projects only help you group them." />
                 </StackPanel>
             </Border>
 

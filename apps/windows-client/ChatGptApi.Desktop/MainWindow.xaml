@@ -6,6 +6,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="GPT-5.4 Workspace"
+        Icon="Assets/AppIcon.png"
         Width="1480"
         Height="920"
         MinWidth="1240"
@@ -44,13 +45,10 @@
                     <Border Width="54"
                             Height="54"
                             Background="{StaticResource AccentMutedBrush}"
-                            CornerRadius="18">
-                        <Viewbox Stretch="Uniform">
-                            <TextBlock Style="{StaticResource IconTextStyle}"
-                                       FontSize="28"
-                                       Foreground="{StaticResource AccentBrush}"
-                                       Text="&#xE8A5;" />
-                        </Viewbox>
+                            CornerRadius="18"
+                            Padding="6">
+                        <Image Source="Assets/AppIcon.png"
+                               Stretch="Uniform" />
                     </Border>
 
                     <StackPanel Margin="16,0,0,0"
@@ -60,7 +58,7 @@
                                    Text="GPT Workspace" />
                         <TextBlock Margin="0,6,0,0"
                                    Foreground="{StaticResource SubtleTextBrush}"
-                                   Text="Private projects, focused chats, and one shared AI workspace." />
+                                   Text="Private chats first. Projects are optional folders when you want structure." />
                     </StackPanel>
                 </StackPanel>
 
@@ -70,9 +68,8 @@
                     <Border Style="{StaticResource ChipBorderStyle}"
                             Margin="0,0,12,0">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource IconTextStyle}"
-                                       Foreground="{StaticResource AccentBrush}"
-                                       Text="&#xE77B;" />
+                            <Path Style="{StaticResource AccentVectorIconStyle}"
+                                  Data="{StaticResource UserIconGeometry}" />
                             <TextBlock Margin="8,0,0,0"
                                        MaxWidth="320"
                                        TextTrimming="CharacterEllipsis"
@@ -83,7 +80,10 @@
                     <Border Style="{StaticResource ChipBorderStyle}"
                             Margin="0,0,12,0">
                         <StackPanel Orientation="Horizontal">
+                            <Path Style="{StaticResource AccentVectorIconStyle}"
+                                  Data="{StaticResource BudgetIconGeometry}" />
                             <TextBlock Foreground="{Binding BillingBrush}"
+                                       Margin="8,0,0,0"
                                        FontWeight="SemiBold"
                                        Text="Budget" />
                             <TextBlock Margin="8,0,0,0"
@@ -96,9 +96,8 @@
                             Margin="0,0,10,0"
                             Click="OnSettingsClick">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource IconTextStyle}"
-                                       Foreground="{StaticResource AccentBrush}"
-                                       Text="&#xE713;" />
+                            <Path Style="{StaticResource AccentVectorIconStyle}"
+                                  Data="{StaticResource SettingsIconGeometry}" />
                             <TextBlock Margin="8,0,0,0"
                                        Text="Settings" />
                         </StackPanel>
@@ -125,9 +124,8 @@
                                 Margin="0,0,10,0"
                                 Click="OnRefreshClick">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource IconTextStyle}"
-                                           Foreground="{StaticResource AccentBrush}"
-                                           Text="&#xE72C;" />
+                                <Path Style="{StaticResource AccentVectorIconStyle}"
+                                      Data="{StaticResource RefreshIconGeometry}" />
                                 <TextBlock Margin="8,0,0,0"
                                            Text="Refresh" />
                             </StackPanel>
@@ -156,10 +154,8 @@
                         <DockPanel LastChildFill="False">
                             <StackPanel Orientation="Horizontal"
                                         DockPanel.Dock="Left">
-                                <TextBlock Style="{StaticResource IconTextStyle}"
-                                           FontSize="18"
-                                           Foreground="{StaticResource AccentBrush}"
-                                           Text="&#xE8B7;" />
+                                <Path Style="{StaticResource AccentVectorIconStyle}"
+                                      Data="{StaticResource ProjectIconGeometry}" />
                                 <TextBlock Margin="10,0,0,0"
                                            FontSize="22"
                                            FontWeight="SemiBold"
@@ -171,18 +167,17 @@
                                     IsEnabled="{Binding IsAuthenticated}"
                                     Click="OnCreateProjectClick">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource IconTextStyle}"
-                                               Foreground="{StaticResource AccentBrush}"
-                                               Text="&#xE710;" />
+                                    <Path Style="{StaticResource AccentVectorIconStyle}"
+                                          Data="{StaticResource PlusIconGeometry}" />
                                     <TextBlock Margin="8,0,0,0"
-                                               Text="New" />
+                                               Text="New Project" />
                                 </StackPanel>
                             </Button>
                         </DockPanel>
 
                         <TextBlock Margin="0,10,0,18"
                                    Foreground="{StaticResource SubtleTextBrush}"
-                                   Text="Spaces for clients, products, or internal initiatives." />
+                                   Text="Optional folders for grouping chats when you want them organized." />
                     </StackPanel>
 
                     <ListBox ItemsSource="{Binding Projects}"
@@ -218,12 +213,10 @@
                                                 Height="38"
                                                 Margin="0,0,12,0"
                                                 Background="#102A23"
-                                                CornerRadius="14">
-                                            <Viewbox Stretch="Uniform">
-                                                <TextBlock Style="{StaticResource IconTextStyle}"
-                                                           Foreground="{StaticResource AccentBrush}"
-                                                           Text="&#xE8B7;" />
-                                            </Viewbox>
+                                                CornerRadius="14"
+                                                Padding="8">
+                                            <Path Style="{StaticResource AccentVectorIconStyle}"
+                                                  Data="{StaticResource ProjectIconGeometry}" />
                                         </Border>
 
                                         <StackPanel Grid.Column="1">
@@ -255,10 +248,8 @@
                         <DockPanel LastChildFill="False">
                             <StackPanel Orientation="Horizontal"
                                         DockPanel.Dock="Left">
-                                <TextBlock Style="{StaticResource IconTextStyle}"
-                                           FontSize="18"
-                                           Foreground="{StaticResource AccentBrush}"
-                                           Text="&#xE8BD;" />
+                                <Path Style="{StaticResource AccentVectorIconStyle}"
+                                      Data="{StaticResource ChatIconGeometry}" />
                                 <TextBlock Margin="10,0,0,0"
                                            FontSize="22"
                                            FontWeight="SemiBold"
@@ -270,18 +261,17 @@
                                     IsEnabled="{Binding IsAuthenticated}"
                                     Click="OnCreateChatClick">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource IconTextStyle}"
-                                               Foreground="{StaticResource AccentBrush}"
-                                               Text="&#xE710;" />
+                                    <Path Style="{StaticResource AccentVectorIconStyle}"
+                                          Data="{StaticResource PlusIconGeometry}" />
                                     <TextBlock Margin="8,0,0,0"
-                                               Text="New" />
+                                               Text="New Chat" />
                                 </StackPanel>
                             </Button>
                         </DockPanel>
 
                         <TextBlock Margin="0,10,0,18"
                                    Foreground="{StaticResource SubtleTextBrush}"
-                                   Text="Focused conversations inside the selected project." />
+                                   Text="Standalone chats work too. Start below or keep them inside a project." />
                     </StackPanel>
 
                     <ListBox ItemsSource="{Binding Chats}"
@@ -317,12 +307,10 @@
                                                 Height="38"
                                                 Margin="0,0,12,0"
                                                 Background="#122230"
-                                                CornerRadius="14">
-                                            <Viewbox Stretch="Uniform">
-                                                <TextBlock Style="{StaticResource IconTextStyle}"
-                                                           Foreground="{StaticResource AccentBrush}"
-                                                           Text="&#xE8BD;" />
-                                            </Viewbox>
+                                                CornerRadius="14"
+                                                Padding="8">
+                                            <Path Style="{StaticResource AccentVectorIconStyle}"
+                                                  Data="{StaticResource ChatIconGeometry}" />
                                         </Border>
 
                                         <StackPanel Grid.Column="1">
@@ -377,9 +365,8 @@
                                     Style="{StaticResource ChipBorderStyle}"
                                     VerticalAlignment="Top">
                                 <DockPanel>
-                                    <TextBlock Style="{StaticResource IconTextStyle}"
-                                               Foreground="{StaticResource WarningBrush}"
-                                               Text="&#xE7BA;" />
+                                    <Path Style="{StaticResource WarningVectorIconStyle}"
+                                          Data="{StaticResource WarningIconGeometry}" />
                                     <TextBlock Margin="8,0,0,0"
                                                Foreground="{StaticResource SubtleTextBrush}"
                                                Text="{Binding StatusMessage}" />
@@ -402,7 +389,7 @@
                             </Grid.RowDefinitions>
 
                             <TextBlock Foreground="{StaticResource SubtleTextBrush}"
-                                       Text="Write a message. Press Ctrl+Enter to send." />
+                                       Text="{Binding ComposerHintText}" />
 
                             <Grid Grid.Row="1"
                                   Margin="0,12,0,0">
@@ -428,11 +415,11 @@
                                         Click="OnSendMessageClick">
                                     <StackPanel Orientation="Horizontal"
                                                 HorizontalAlignment="Center">
-                                        <TextBlock Style="{StaticResource IconTextStyle}"
-                                                   Foreground="White"
-                                                   Text="&#xE724;" />
+                                        <Path Style="{StaticResource VectorIconStyle}"
+                                              Stroke="White"
+                                              Data="{StaticResource SendIconGeometry}" />
                                         <TextBlock Margin="8,0,0,0"
-                                                   Text="Send" />
+                                                   Text="{Binding SendButtonText}" />
                                     </StackPanel>
                                 </Button>
                             </Grid>
