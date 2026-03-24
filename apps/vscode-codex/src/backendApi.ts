@@ -6,7 +6,9 @@ import {
   type AuthResponse,
   type Chat,
   type ChatResponse,
+  type ChatMessage,
   type MessageSendResponse,
+  type MessageResponse,
   type Project,
   type ProjectResponse,
   type SessionResponse
@@ -75,6 +77,11 @@ export class BackendApi {
     });
 
     return response.data;
+  }
+
+  async listMessages(chatId: string) {
+    const response = await (await this.client()).get<MessageResponse>(`/api/chats/${chatId}/messages`);
+    return response.data.items;
   }
 
   async sendMessage(chatId: string, content: string, metadata: Record<string, unknown>) {

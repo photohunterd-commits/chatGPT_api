@@ -1,6 +1,7 @@
 export const DEFAULT_CODEX_MODEL = "gpt-5-mini";
 export const DEFAULT_CODEX_MODEL_LABEL = "GPT-5 mini";
 export const DEFAULT_CODEX_REASONING = "medium";
+export type ContextMode = "none" | "selection" | "file";
 
 export interface User {
   id: string;
@@ -45,12 +46,26 @@ export interface Chat {
   lastMessageAt: string | null;
 }
 
+export interface ChatMessage {
+  id: string;
+  chatId: string;
+  role: string;
+  content: string;
+  source: string;
+  createdAt: string;
+}
+
 export interface ProjectResponse {
   items: Project[];
 }
 
 export interface ChatResponse {
   items: Chat[];
+}
+
+export interface MessageResponse {
+  chat: Chat;
+  items: ChatMessage[];
 }
 
 export interface SessionResponse {
@@ -60,15 +75,18 @@ export interface SessionResponse {
 
 export interface MessageSendResponse {
   billing: BillingSummary;
+  userMessage?: ChatMessage;
+  assistantMessage?: ChatMessage;
 }
 
-export interface HomeState {
+export interface SidebarState {
   hasSession: boolean;
   hasProviderKey: boolean;
   user?: User;
   billing?: BillingSummary;
-  projects: Project[];
-  chats: Chat[];
   activeProject?: Project;
   activeChat?: Chat;
+  messages: ChatMessage[];
+  canUseEditorContext: boolean;
+  activeEditorLabel?: string;
 }
