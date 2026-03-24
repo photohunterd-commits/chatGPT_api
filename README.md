@@ -1,5 +1,7 @@
 # GPT-5.4 Workspace
 
+Russian guide: [README.ru.md](README.ru.md)
+
 This repository contains three deliverables:
 
 1. A server-side chat backend that stores users, projects, chats, and messages in SQLite and calls `gpt-5.4` through an OpenAI-compatible Responses API.
