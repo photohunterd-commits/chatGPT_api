@@ -1,0 +1,193 @@
+{
+  "name": "codex-project-bridge",
+  "displayName": "Codex Project Bridge",
+  "description": "VS Code utility for Codex workflows backed by the GPT-5.4 project chat server.",
+  "version": "0.1.0",
+  "publisher": "photohunterd",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/photohunterd-commits/chatGPT_api.git"
+  },
+  "files": [
+    "dist/**",
+    "assets/**",
+    "package.json",
+    "README.md",
+    "LICENSE.txt"
+  ],
+  "engines": {
+    "vscode": "^1.102.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:codexBridge.explorer",
+    "onCommand:codexBridge.register",
+    "onCommand:codexBridge.login",
+    "onCommand:codexBridge.logout",
+    "onCommand:codexBridge.configureProviderKey",
+    "onCommand:codexBridge.refresh",
+    "onCommand:codexBridge.pickProject",
+    "onCommand:codexBridge.pickChat",
+    "onCommand:codexBridge.createProject",
+    "onCommand:codexBridge.createChat",
+    "onCommand:codexBridge.sendSelection"
+  ],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "npm run typecheck && esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.js --sourcemap",
+    "package": "vsce package --no-yarn --no-dependencies"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codexBridge",
+          "title": "Codex Bridge",
+          "icon": "assets/codex-bridge.svg"
+        }
+      ]
+    },
+    "views": {
+      "codexBridge": [
+        {
+          "id": "codexBridge.explorer",
+          "name": "Projects & Chats"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "codexBridge.register",
+        "title": "Codex Bridge: Register"
+      },
+      {
+        "command": "codexBridge.login",
+        "title": "Codex Bridge: Sign In"
+      },
+      {
+        "command": "codexBridge.logout",
+        "title": "Codex Bridge: Log Out"
+      },
+      {
+        "command": "codexBridge.configureProviderKey",
+        "title": "Codex Bridge: Configure Model API Key"
+      },
+      {
+        "command": "codexBridge.refresh",
+        "title": "Codex Bridge: Refresh"
+      },
+      {
+        "command": "codexBridge.pickProject",
+        "title": "Codex Bridge: Pick Project"
+      },
+      {
+        "command": "codexBridge.pickChat",
+        "title": "Codex Bridge: Pick Chat"
+      },
+      {
+        "command": "codexBridge.createProject",
+        "title": "Codex Bridge: Create Project"
+      },
+      {
+        "command": "codexBridge.createChat",
+        "title": "Codex Bridge: Create Chat"
+      },
+      {
+        "command": "codexBridge.sendSelection",
+        "title": "Codex Bridge: Send Selection to Chat"
+      },
+      {
+        "command": "codexBridge.setProject",
+        "title": "Codex Bridge: Set Active Project"
+      },
+      {
+        "command": "codexBridge.setChat",
+        "title": "Codex Bridge: Set Active Chat"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "codexBridge.register",
+          "when": "view == codexBridge.explorer",
+          "group": "navigation"
+        },
+        {
+          "command": "codexBridge.login",
+          "when": "view == codexBridge.explorer",
+          "group": "navigation"
+        },
+        {
+          "command": "codexBridge.configureProviderKey",
+          "when": "view == codexBridge.explorer",
+          "group": "navigation"
+        },
+        {
+          "command": "codexBridge.refresh",
+          "when": "view == codexBridge.explorer",
+          "group": "navigation"
+        },
+        {
+          "command": "codexBridge.createProject",
+          "when": "view == codexBridge.explorer",
+          "group": "navigation"
+        },
+        {
+          "command": "codexBridge.createChat",
+          "when": "view == codexBridge.explorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "codexBridge.setProject",
+          "when": "view == codexBridge.explorer && viewItem == project",
+          "group": "inline"
+        },
+        {
+          "command": "codexBridge.setChat",
+          "when": "view == codexBridge.explorer && viewItem == chat",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Codex Project Bridge",
+      "properties": {
+        "codexBridge.baseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:3030",
+          "description": "Base URL of the GPT-5.4 chat backend."
+        },
+        "codexBridge.userEmail": {
+          "type": "string",
+          "default": "",
+          "description": "Last signed-in email for the Codex Bridge backend."
+        },
+        "codexBridge.defaultProjectId": {
+          "type": "string",
+          "default": "",
+          "description": "The currently active project id."
+        },
+        "codexBridge.defaultChatId": {
+          "type": "string",
+          "default": "",
+          "description": "The currently active chat id."
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.8.1",
+    "@types/vscode": "^1.102.0",
+    "@vscode/vsce": "^3.6.1",
+    "axios": "^1.12.2",
+    "esbuild": "^0.25.11",
+    "typescript": "^5.9.3"
+  }
+}

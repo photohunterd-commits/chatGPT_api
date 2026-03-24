@@ -1,0 +1,373 @@
+<Window x:Class="ChatGptApi.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:ChatGptApi.Desktop.ViewModels"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="GPT-5.4 Workspace"
+        Width="1480"
+        Height="900"
+        MinWidth="1180"
+        MinHeight="760"
+        Loaded="OnLoaded"
+        Background="#F6F2EA">
+    <Window.Resources>
+        <SolidColorBrush x:Key="ShellBrush" Color="#123524" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#D95D39" />
+        <SolidColorBrush x:Key="CardBrush" Color="#FFFDF9" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#6A6257" />
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
+
+    <DockPanel LastChildFill="True">
+        <Border DockPanel.Dock="Top"
+                Padding="24"
+                Background="{StaticResource ShellBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock FontSize="30"
+                               FontWeight="SemiBold"
+                               Foreground="#FFF8EE"
+                               Text="GPT-5.4 Workspace" />
+                    <TextBlock Margin="0,8,0,0"
+                               Foreground="#E5DCCF"
+                               Text="Projects, chats, and Codex workflows synced through one private per-user backend." />
+                    <TextBlock Margin="0,8,0,0"
+                               Foreground="#F4C9B0"
+                               FontWeight="SemiBold"
+                               Text="{Binding CurrentUserStatusText}" />
+                </StackPanel>
+
+                <Border Grid.Column="1"
+                        Padding="18"
+                        CornerRadius="18"
+                        Background="#204C36">
+                    <Grid Width="960">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="2*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Foreground="#EDE3D3"
+                                   FontWeight="SemiBold"
+                                   Text="Backend URL" />
+                        <TextBlock Grid.Column="1"
+                                   Margin="12,0,0,0"
+                                   Foreground="#EDE3D3"
+                                   FontWeight="SemiBold"
+                                   Text="Model API Key" />
+
+                        <TextBox Grid.Row="1"
+                                 Grid.Column="0"
+                                 Height="38"
+                                 Margin="0,8,0,0"
+                                 Padding="10,8"
+                                 Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}" />
+                        <PasswordBox x:Name="ProviderApiKeyBox"
+                                     Grid.Row="1"
+                                     Grid.Column="1"
+                                     Height="38"
+                                     Margin="12,8,0,0"
+                                     Padding="10,8"
+                                     PasswordChanged="OnProviderApiKeyChanged" />
+
+                        <DockPanel Grid.Row="2"
+                                   Grid.ColumnSpan="2"
+                                   Margin="0,14,0,0">
+                            <TextBlock Foreground="#E5DCCF"
+                                       VerticalAlignment="Center"
+                                       Text="The model key is stored only on this Windows profile and is never committed to git." />
+                            <StackPanel DockPanel.Dock="Right"
+                                        Orientation="Horizontal">
+                                <Button Width="92"
+                                        Height="36"
+                                        Margin="12,0,0,0"
+                                        Click="OnSaveSettingsClick"
+                                        Content="Save" />
+                                <Button Width="92"
+                                        Height="36"
+                                        Margin="12,0,0,0"
+                                        Click="OnRegisterClick"
+                                        Content="Register" />
+                                <Button Width="88"
+                                        Height="36"
+                                        Margin="12,0,0,0"
+                                        Click="OnLoginClick"
+                                        Content="Sign In" />
+                                <Button Width="88"
+                                        Height="36"
+                                        Margin="12,0,0,0"
+                                        Click="OnLogoutClick"
+                                        Content="Log Out" />
+                                <Button Width="98"
+                                        Height="36"
+                                        Margin="12,0,0,0"
+                                        Background="{StaticResource AccentBrush}"
+                                        Foreground="White"
+                                        BorderBrush="{StaticResource AccentBrush}"
+                                        Click="OnRefreshClick"
+                                        Content="Refresh" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Grid Margin="20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="320" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Margin="0,0,16,0"
+                    Padding="18"
+                    Background="{StaticResource CardBrush}"
+                    BorderBrush="#E0D4C3"
+                    BorderThickness="1"
+                    CornerRadius="22">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top">
+                        <DockPanel Margin="0,0,0,14">
+                            <TextBlock FontSize="22"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource ShellBrush}"
+                                       Text="Projects" />
+                            <Button Width="96"
+                                    Height="34"
+                                    HorizontalAlignment="Right"
+                                    DockPanel.Dock="Right"
+                                    Background="{StaticResource ShellBrush}"
+                                    Foreground="White"
+                                    BorderBrush="{StaticResource ShellBrush}"
+                                    Click="OnCreateProjectClick"
+                                    Content="New" />
+                        </DockPanel>
+                        <TextBlock Margin="0,0,0,14"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="Group work by initiative, customer, or product line." />
+                    </StackPanel>
+
+                    <ListBox ItemsSource="{Binding Projects}"
+                             SelectedItem="{Binding SelectedProject, Mode=TwoWay}"
+                             SelectionChanged="OnProjectSelectionChanged"
+                             BorderThickness="0"
+                             Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:ProjectItem}">
+                                <Border Margin="0,0,0,10"
+                                        Padding="16"
+                                        Background="#F7F0E5"
+                                        BorderBrush="#E2D2B5"
+                                        BorderThickness="1"
+                                        CornerRadius="18">
+                                    <StackPanel>
+                                        <TextBlock FontSize="17"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource ShellBrush}"
+                                                   Text="{Binding Name}" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Foreground="{StaticResource MutedBrush}"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding Description}" />
+                                        <TextBlock Margin="0,10,0,0"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   Text="{Binding Footer}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="1"
+                    Margin="0,0,16,0"
+                    Padding="18"
+                    Background="{StaticResource CardBrush}"
+                    BorderBrush="#E0D4C3"
+                    BorderThickness="1"
+                    CornerRadius="22">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top">
+                        <DockPanel Margin="0,0,0,14">
+                            <TextBlock FontSize="22"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource ShellBrush}"
+                                       Text="Chats" />
+                            <Button Width="96"
+                                    Height="34"
+                                    HorizontalAlignment="Right"
+                                    DockPanel.Dock="Right"
+                                    Background="{StaticResource ShellBrush}"
+                                    Foreground="White"
+                                    BorderBrush="{StaticResource ShellBrush}"
+                                    Click="OnCreateChatClick"
+                                    Content="New" />
+                        </DockPanel>
+                        <TextBlock Margin="0,0,0,14"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="Each project can hold multiple focused conversations." />
+                    </StackPanel>
+
+                    <ListBox ItemsSource="{Binding Chats}"
+                             SelectedItem="{Binding SelectedChat, Mode=TwoWay}"
+                             SelectionChanged="OnChatSelectionChanged"
+                             BorderThickness="0"
+                             Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:ChatItem}">
+                                <Border Margin="0,0,0,10"
+                                        Padding="16"
+                                        Background="#FCF8F1"
+                                        BorderBrush="#EADCCB"
+                                        BorderThickness="1"
+                                        CornerRadius="18">
+                                    <StackPanel>
+                                        <TextBlock FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource ShellBrush}"
+                                                   Text="{Binding Title}" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Foreground="{StaticResource MutedBrush}"
+                                                   Text="{Binding Model}" />
+                                        <TextBlock Margin="0,10,0,0"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   Text="{Binding Footer}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="2"
+                    Padding="18"
+                    Background="{StaticResource CardBrush}"
+                    BorderBrush="#E0D4C3"
+                    BorderThickness="1"
+                    CornerRadius="22">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top">
+                        <TextBlock FontSize="26"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource ShellBrush}"
+                                   Text="{Binding SelectedChatTitle}" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="{Binding SelectedChatSubtitle}" />
+
+                        <Border Margin="0,18,0,18"
+                                Padding="14"
+                                Background="#F3E7D4"
+                                CornerRadius="18">
+                            <DockPanel>
+                                <TextBlock Foreground="{StaticResource ShellBrush}"
+                                           FontWeight="SemiBold"
+                                           Text="{Binding StatusMessage}" />
+                                <TextBlock DockPanel.Dock="Right"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           FontWeight="SemiBold"
+                                           Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                           Text="Working..." />
+                            </DockPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <Border DockPanel.Dock="Bottom"
+                            Padding="18"
+                            Background="#FCF8F1"
+                            BorderBrush="#E8D7C2"
+                            BorderThickness="1"
+                            CornerRadius="18">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Foreground="{StaticResource MutedBrush}"
+                                       Text="Compose a message. Press Ctrl+Enter to send." />
+                            <Grid Grid.Row="1"
+                                  Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBox Grid.Column="0"
+                                         MinHeight="110"
+                                         Padding="14"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         VerticalScrollBarVisibility="Auto"
+                                         KeyDown="OnDraftKeyDown"
+                                         Text="{Binding DraftMessage, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Grid.Column="1"
+                                        Width="132"
+                                        Height="46"
+                                        Margin="14,0,0,0"
+                                        VerticalAlignment="Bottom"
+                                        Background="{StaticResource AccentBrush}"
+                                        Foreground="White"
+                                        BorderBrush="{StaticResource AccentBrush}"
+                                        Click="OnSendMessageClick"
+                                        Content="Send" />
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ListBox ItemsSource="{Binding Messages}"
+                                 BorderThickness="0"
+                                 Background="Transparent">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:MessageItem}">
+                                    <Border MaxWidth="760"
+                                            Margin="0,0,0,14"
+                                            Padding="18"
+                                            HorizontalAlignment="{Binding BubbleAlignment}"
+                                            Background="{Binding BubbleBackground}"
+                                            BorderBrush="{Binding BubbleBorder}"
+                                            BorderThickness="1"
+                                            CornerRadius="20">
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Foreground="{Binding Foreground}"
+                                                       Text="{Binding Header}" />
+                                            <TextBlock Margin="0,10,0,0"
+                                                       Foreground="{Binding Foreground}"
+                                                       TextWrapping="Wrap"
+                                                       Text="{Binding Content}" />
+                                            <TextBlock Margin="0,12,0,0"
+                                                       FontSize="12"
+                                                       Opacity="0.75"
+                                                       Foreground="{Binding Foreground}"
+                                                       Text="{Binding Timestamp}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

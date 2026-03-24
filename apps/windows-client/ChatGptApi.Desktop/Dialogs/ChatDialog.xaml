@@ -1,0 +1,60 @@
+<Window x:Class="ChatGptApi.Desktop.Dialogs.ChatDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Create Chat"
+        Width="460"
+        Height="220"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#F6F2EA">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock FontSize="24"
+                   FontWeight="SemiBold"
+                   Foreground="#153A29"
+                   Text="New Chat" />
+
+        <StackPanel Grid.Row="1"
+                    Margin="0,18,0,0">
+            <TextBlock Text="Title"
+                       FontWeight="SemiBold"
+                       Foreground="#153A29" />
+            <TextBox x:Name="TitleTextBox"
+                     Margin="0,8,0,0"
+                     Height="38"
+                     Padding="10,8"
+                     Text="Workspace review"
+                     Background="White"
+                     BorderBrush="#CDA778" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="2"
+                   Margin="0,18,0,0"
+                   Foreground="#6A6257"
+                   Text="The server will use the project's default model and reasoning settings." />
+
+        <StackPanel Grid.Row="3"
+                    Margin="0,24,0,0"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Width="100"
+                    Height="38"
+                    Margin="0,0,12,0"
+                    Click="OnCancelClick"
+                    Content="Cancel" />
+            <Button Width="120"
+                    Height="38"
+                    Background="#153A29"
+                    Foreground="White"
+                    BorderBrush="#153A29"
+                    Click="OnCreateClick"
+                    Content="Create Chat" />
+        </StackPanel>
+    </Grid>
+</Window>

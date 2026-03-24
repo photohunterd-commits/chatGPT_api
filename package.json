@@ -1,0 +1,29 @@
+{
+  "name": "chatgpt-api-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Workspace for the GPT-5.4 chat backend, native Windows client, and VS Code Codex utility.",
+  "workspaces": [
+    "apps/server",
+    "apps/vscode-codex"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "build": "npm run build --workspace apps/server && npm run build --workspace apps/vscode-codex",
+    "build:server": "npm run build --workspace apps/server",
+    "build:vscode": "npm run build --workspace apps/vscode-codex",
+    "dev:server": "npm run dev --workspace apps/server",
+    "package:vscode": "npm run package --workspace apps/vscode-codex",
+    "publish:desktop": "powershell -ExecutionPolicy Bypass -File scripts/publish-desktop.ps1",
+    "deploy:server": "node scripts/deploy-server.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/photohunterd-commits/chatGPT_api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/photohunterd-commits/chatGPT_api/issues"
+  },
+  "homepage": "https://github.com/photohunterd-commits/chatGPT_api#readme",
+  "license": "MIT"
+}

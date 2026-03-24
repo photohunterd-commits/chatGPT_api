@@ -1,0 +1,43 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.pfx
+*.secret
+server.env
+
+# Workspace tooling
+.tools/
+
+# Build outputs
+dist/
+build/
+coverage/
+*.tsbuildinfo
+*.vsix
+
+# Server data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# .NET / WPF
+bin/
+obj/
+publish/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode-test/
+
+# Deployment scratch
+deployment/
+deploy-artifact/
