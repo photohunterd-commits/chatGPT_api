@@ -5,7 +5,11 @@ import { z } from "zod";
 dotenv.config();
 
 const envSchema = z.object({
-  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value ? value : undefined)),
   OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
   OPENAI_MODEL: z.string().default("gpt-5.4"),
   OPENAI_REASONING_EFFORT: z.enum(["low", "medium", "high", "xhigh"]).default("medium"),
