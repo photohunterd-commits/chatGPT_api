@@ -82,10 +82,6 @@
                         <StackPanel Orientation="Horizontal">
                             <Path Style="{StaticResource AccentVectorIconStyle}"
                                   Data="{StaticResource BudgetIconGeometry}" />
-                            <TextBlock Foreground="{Binding BillingBrush}"
-                                       Margin="8,0,0,0"
-                                       FontWeight="SemiBold"
-                                       Text="Budget" />
                             <TextBlock Margin="8,0,0,0"
                                        Foreground="{Binding BillingBrush}"
                                        Text="{Binding BillingChipText}" />
