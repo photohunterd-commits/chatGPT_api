@@ -42,38 +42,12 @@ public partial class MainWindow : Window
 
     private async void OnRegisterClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new AuthDialog(_viewModel, isRegistration: true)
-        {
-            Owner = this
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            var succeeded = await RunSafeAsync(() => _viewModel.RegisterAsync(dialog.DisplayName, dialog.Email, dialog.Password));
-
-            if (succeeded)
-            {
-                await PromptForProviderKeyIfMissingAsync();
-            }
-        }
+        await OpenRegisterFlowAsync();
     }
 
     private async void OnLoginClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new AuthDialog(_viewModel, isRegistration: false)
-        {
-            Owner = this
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            var succeeded = await RunSafeAsync(() => _viewModel.LoginAsync(dialog.Email, dialog.Password));
-
-            if (succeeded)
-            {
-                await PromptForProviderKeyIfMissingAsync();
-            }
-        }
+        await OpenLoginFlowAsync();
     }
 
     private async void OnLogoutClick(object sender, RoutedEventArgs e)
@@ -83,15 +57,7 @@ public partial class MainWindow : Window
 
     private async void OnChangePasswordClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new ChangePasswordDialog
-        {
-            Owner = this
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            await RunSafeAsync(() => _viewModel.ChangePasswordAsync(dialog.CurrentPassword, dialog.NewPassword));
-        }
+        await OpenChangePasswordFlowAsync();
     }
 
     private async void OnProjectSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -172,7 +138,7 @@ public partial class MainWindow : Window
 
     private async Task OpenSettingsAsync()
     {
-        var dialog = new SettingsDialog(_viewModel.ProviderApiKey)
+        var dialog = new SettingsDialog(_viewModel.ProviderApiKey, _viewModel.IsAuthenticated, _viewModel.CurrentUserStatusText)
         {
             Owner = this
         };
@@ -181,6 +147,80 @@ public partial class MainWindow : Window
         {
             _viewModel.ProviderApiKey = dialog.ProviderApiKey;
             await RunSafeAsync(_viewModel.SaveSettingsAsync);
+            return;
+        }
+
+        switch (dialog.RequestedAction)
+        {
+            case SettingsDialogAction.Register:
+                await OpenRegisterFlowAsync();
+                break;
+            case SettingsDialogAction.Login:
+                await OpenLoginFlowAsync();
+                break;
+            case SettingsDialogAction.ChangePassword:
+                await OpenChangePasswordFlowAsync();
+                break;
+            case SettingsDialogAction.Logout:
+                await RunSafeAsync(_viewModel.LogoutAsync);
+                break;
+        }
+    }
+
+    private async Task<bool> OpenRegisterFlowAsync()
+    {
+        var dialog = new AuthDialog(_viewModel, isRegistration: true)
+        {
+            Owner = this
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return false;
+        }
+
+        var succeeded = await RunSafeAsync(() => _viewModel.RegisterAsync(dialog.DisplayName, dialog.Email, dialog.Password));
+
+        if (succeeded)
+        {
+            await PromptForProviderKeyIfMissingAsync();
+        }
+
+        return succeeded;
+    }
+
+    private async Task<bool> OpenLoginFlowAsync()
+    {
+        var dialog = new AuthDialog(_viewModel, isRegistration: false)
+        {
+            Owner = this
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return false;
+        }
+
+        var succeeded = await RunSafeAsync(() => _viewModel.LoginAsync(dialog.Email, dialog.Password));
+
+        if (succeeded)
+        {
+            await PromptForProviderKeyIfMissingAsync();
+        }
+
+        return succeeded;
+    }
+
+    private async Task OpenChangePasswordFlowAsync()
+    {
+        var dialog = new ChangePasswordDialog
+        {
+            Owner = this
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            await RunSafeAsync(() => _viewModel.ChangePasswordAsync(dialog.CurrentPassword, dialog.NewPassword));
         }
     }
 

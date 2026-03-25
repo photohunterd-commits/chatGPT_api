@@ -1,4 +1,4 @@
-﻿<Window x:Class="ChatGptApi.Desktop.MainWindow"
+<Window x:Class="ChatGptApi.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -14,30 +14,82 @@
         MinHeight="820"
         Loaded="OnLoaded">
     <Window.Resources>
-        <Style x:Key="SidebarCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-            <Setter Property="CornerRadius" Value="24" />
-            <Setter Property="Padding" Value="18" />
-        </Style>
-        <Style x:Key="MiniButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-            <Setter Property="Padding" Value="10,7" />
+        <Style x:Key="MiniButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource GhostButtonStyle}">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Padding" Value="0" />
             <Setter Property="FontSize" Value="12.5" />
         </Style>
+
         <Style x:Key="FrameLabelStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+        </Style>
+
+        <Style x:Key="SidebarSectionLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+        </Style>
+
+        <Style x:Key="SidebarListBoxStyle" TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+        </Style>
+
+        <Style x:Key="SidebarListItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="RowBorder"
+                                Background="Transparent"
+                                CornerRadius="16"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RowBorder"
+                                        Property="Background"
+                                        Value="{StaticResource SidebarHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="RowBorder"
+                                        Property="Background"
+                                        Value="{StaticResource SidebarActiveBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
     <Grid Background="{StaticResource WindowBackgroundBrush}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="284" />
+            <ColumnDefinition Width="286" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0" Background="{StaticResource ShellBrush}">
-            <Grid Margin="18,20,18,18">
+        <Border Grid.Column="0"
+                Background="{StaticResource ShellBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,1,0">
+            <Grid Margin="18,18,16,18">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -47,332 +99,539 @@
 
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <Border Width="40" Height="40" CornerRadius="12" Background="{StaticResource AccentBrush}" Padding="8">
-                            <Image Source="Assets/AppIcon.png" Stretch="Uniform" />
+                        <Border Width="42"
+                                Height="42"
+                                CornerRadius="13"
+                                Background="{StaticResource AccentBrush}"
+                                Padding="8">
+                            <Image Source="Assets/AppIcon.png"
+                                   Stretch="Uniform" />
                         </Border>
-                        <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
-                            <TextBlock FontSize="18" FontWeight="SemiBold" Text="GPT Workspace" />
-                            <TextBlock Margin="0,3,0,0" Foreground="{StaticResource SubtleTextBrush}" FontSize="12" Text="Private editorial AI" />
+                        <StackPanel Margin="14,0,0,0"
+                                    VerticalAlignment="Center">
+                            <TextBlock FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Text="GPT Workspace" />
+                            <TextBlock Margin="0,3,0,0"
+                                       Foreground="{StaticResource SubtleTextBrush}"
+                                       FontSize="12"
+                                       Text="Private editorial AI" />
                         </StackPanel>
                     </StackPanel>
-
-                    <Button Margin="0,24,0,0" Style="{StaticResource PrimaryButtonStyle}" IsEnabled="{Binding IsAuthenticated}" Click="OnCreateChatClick">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Path Style="{StaticResource VectorIconStyle}" Stroke="#042B29" Data="{StaticResource PlusIconGeometry}" />
-                            <TextBlock Margin="10,0,0,0" Foreground="#042B29" Text="New Conversation" />
-                        </StackPanel>
-                    </Button>
                 </StackPanel>
 
-                <ScrollViewer Grid.Row="2" Margin="0,22,0,18" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <Button Grid.Row="1"
+                        Margin="0,22,0,18"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        IsEnabled="{Binding IsAuthenticated}"
+                        Click="OnCreateChatClick">
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center">
+                        <Path Style="{StaticResource VectorIconStyle}"
+                              Stroke="#042B29"
+                              Data="{StaticResource PlusIconGeometry}" />
+                        <TextBlock Margin="10,0,0,0"
+                                   Foreground="#042B29"
+                                   Text="New chat" />
+                    </StackPanel>
+                </Button>
+
+                <ScrollViewer Grid.Row="2"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
                     <StackPanel>
-                        <Border Style="{StaticResource SidebarCardStyle}">
-                            <StackPanel>
-                                <DockPanel LastChildFill="True">
-                                    <Button DockPanel.Dock="Right" Style="{StaticResource MiniButtonStyle}" IsEnabled="{Binding IsAuthenticated}" Click="OnCreateProjectClick">
-                                        <Path Style="{StaticResource AccentVectorIconStyle}" Data="{StaticResource PlusIconGeometry}" />
-                                    </Button>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource FrameLabelStyle}" Text="PROJECTS" />
-                                        <TextBlock Margin="0,6,0,0" FontSize="18" FontWeight="SemiBold" Text="Structure" />
-                                    </StackPanel>
-                                </DockPanel>
-                                <TextBlock Margin="0,10,0,14" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Text="Optional folders for organizing conversations." />
-                                <ListBox x:Name="ProjectsListBox" ItemsSource="{Binding Projects}" SelectedItem="{Binding SelectedProject, Mode=TwoWay}" PreviewMouseLeftButtonUp="OnProjectsListMouseLeftButtonUp" SelectionChanged="OnProjectSelectionChanged" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate DataType="{x:Type local:ProjectItem}">
-                                            <Border Margin="0,0,0,8" Padding="12" CornerRadius="18">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="Transparent" />
-                                                        <Setter Property="Cursor" Value="Hand" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
-                                                                <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                                <DockPanel>
-                                                    <Border Width="32" Height="32" CornerRadius="11" Background="{StaticResource AccentMutedBrush}" Padding="6">
-                                                        <Path Style="{StaticResource AccentVectorIconStyle}" Data="{StaticResource ProjectIconGeometry}" />
-                                                    </Border>
-                                                    <StackPanel Margin="12,0,0,0">
-                                                        <TextBlock FontSize="14.5" FontWeight="SemiBold" Text="{Binding Name}" />
-                                                        <TextBlock Margin="0,3,0,0" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Text="{Binding Footer}" />
-                                                    </StackPanel>
-                                                </DockPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </StackPanel>
-                        </Border>
-                        <Border Margin="0,14,0,0" Style="{StaticResource SidebarCardStyle}">
-                            <StackPanel>
-                                <DockPanel LastChildFill="True">
-                                    <Button DockPanel.Dock="Right" Style="{StaticResource MiniButtonStyle}" IsEnabled="{Binding IsAuthenticated}" Click="OnCreateChatClick">
-                                        <Path Style="{StaticResource AccentVectorIconStyle}" Data="{StaticResource PlusIconGeometry}" />
-                                    </Button>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource FrameLabelStyle}" Text="CHATS" />
-                                        <TextBlock Margin="0,6,0,0" FontSize="18" FontWeight="SemiBold" Text="Threads" />
-                                    </StackPanel>
-                                </DockPanel>
-                                <TextBlock Margin="0,10,0,14" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Text="Fast access to private chat threads." />
-                                <ListBox x:Name="ChatsListBox" ItemsSource="{Binding Chats}" SelectedItem="{Binding SelectedChat, Mode=TwoWay}" PreviewMouseLeftButtonUp="OnChatsListMouseLeftButtonUp" SelectionChanged="OnChatSelectionChanged" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate DataType="{x:Type local:ChatItem}">
-                                            <Border Margin="0,0,0,8" Padding="12" CornerRadius="18">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="Transparent" />
-                                                        <Setter Property="Cursor" Value="Hand" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
-                                                                <Setter Property="Background" Value="#122123" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                                <DockPanel>
-                                                    <Border Width="32" Height="32" CornerRadius="11" Background="#102227" Padding="6">
-                                                        <Path Style="{StaticResource AccentVectorIconStyle}" Data="{StaticResource ChatIconGeometry}" />
-                                                    </Border>
-                                                    <StackPanel Margin="12,0,0,0">
-                                                        <TextBlock FontSize="14.5" FontWeight="SemiBold" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Margin="0,3,0,0" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Text="{Binding Footer}" />
-                                                    </StackPanel>
-                                                </DockPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </StackPanel>
-                        </Border>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource SidebarSectionLabelStyle}"
+                                       VerticalAlignment="Center"
+                                       Text="PROJECTS" />
+                            <Button Grid.Column="1"
+                                    Style="{StaticResource MiniButtonStyle}"
+                                    IsEnabled="{Binding IsAuthenticated}"
+                                    Click="OnCreateProjectClick">
+                                <Path Style="{StaticResource AccentVectorIconStyle}"
+                                      Data="{StaticResource PlusIconGeometry}" />
+                            </Button>
+                        </Grid>
+
+                        <ListBox x:Name="ProjectsListBox"
+                                 Style="{StaticResource SidebarListBoxStyle}"
+                                 ItemContainerStyle="{StaticResource SidebarListItemStyle}"
+                                 ItemsSource="{Binding Projects}"
+                                 SelectedItem="{Binding SelectedProject, Mode=TwoWay}"
+                                 PreviewMouseLeftButtonUp="OnProjectsListMouseLeftButtonUp"
+                                 SelectionChanged="OnProjectSelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:ProjectItem}">
+                                    <Grid MinHeight="54">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="30"
+                                                Height="30"
+                                                Margin="12,0,0,0"
+                                                VerticalAlignment="Center"
+                                                CornerRadius="10"
+                                                Background="{StaticResource AccentMutedBrush}"
+                                                Padding="6">
+                                            <Path Style="{StaticResource AccentVectorIconStyle}"
+                                                  Data="{StaticResource ProjectIconGeometry}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1"
+                                                    Margin="12,8,12,8"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock FontSize="14"
+                                                       FontWeight="SemiBold"
+                                                       Text="{Binding Name}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Margin="0,2,0,0"
+                                                       FontSize="11.5"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       Text="{Binding Footer}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Grid Margin="0,18,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource SidebarSectionLabelStyle}"
+                                       VerticalAlignment="Center"
+                                       Text="CHATS" />
+                            <Button Grid.Column="1"
+                                    Style="{StaticResource MiniButtonStyle}"
+                                    IsEnabled="{Binding IsAuthenticated}"
+                                    Click="OnCreateChatClick">
+                                <Path Style="{StaticResource AccentVectorIconStyle}"
+                                      Data="{StaticResource PlusIconGeometry}" />
+                            </Button>
+                        </Grid>
+
+                        <ListBox x:Name="ChatsListBox"
+                                 Style="{StaticResource SidebarListBoxStyle}"
+                                 ItemContainerStyle="{StaticResource SidebarListItemStyle}"
+                                 ItemsSource="{Binding Chats}"
+                                 SelectedItem="{Binding SelectedChat, Mode=TwoWay}"
+                                 PreviewMouseLeftButtonUp="OnChatsListMouseLeftButtonUp"
+                                 SelectionChanged="OnChatSelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:ChatItem}">
+                                    <Grid MinHeight="58">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="30"
+                                                Height="30"
+                                                Margin="12,0,0,0"
+                                                VerticalAlignment="Center"
+                                                CornerRadius="10"
+                                                Background="#102227"
+                                                Padding="6">
+                                            <Path Style="{StaticResource AccentVectorIconStyle}"
+                                                  Data="{StaticResource ChatIconGeometry}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1"
+                                                    Margin="12,9,12,9"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock FontSize="14"
+                                                       FontWeight="SemiBold"
+                                                       Text="{Binding Title}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Margin="0,2,0,0"
+                                                       FontSize="11.5"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       Text="{Binding Footer}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </StackPanel>
                 </ScrollViewer>
 
                 <StackPanel Grid.Row="3">
                     <StackPanel Orientation="Horizontal">
-                        <Button Style="{StaticResource GhostButtonStyle}" Margin="0,0,10,0" Click="OnSettingsClick" Content="Settings" />
-                        <Button Style="{StaticResource GhostButtonStyle}" Click="OnRefreshClick" Content="Refresh" />
+                        <Button Style="{StaticResource GhostButtonStyle}"
+                                Margin="0,0,10,0"
+                                Click="OnSettingsClick"
+                                Content="Settings" />
+                        <Button Style="{StaticResource GhostButtonStyle}"
+                                Click="OnRefreshClick"
+                                Content="Refresh" />
                     </StackPanel>
-                    <Border Margin="0,16,0,0" Background="{StaticResource PanelAltBrush}" CornerRadius="20" Padding="14">
+
+                    <Border Margin="0,14,0,0"
+                            Padding="14,12"
+                            Background="{StaticResource PanelAltBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="18">
                         <StackPanel>
-                            <TextBlock FontWeight="SemiBold" Text="{Binding CurrentUserStatusText}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource SubtleTextBrush}" FontSize="12" Text="{Binding BillingChipText}" />
+                            <TextBlock FontWeight="SemiBold"
+                                       Text="{Binding CurrentUserStatusText}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Margin="0,4,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource SubtleTextBrush}"
+                                       Text="Private workspace" />
+                            <TextBlock Margin="0,10,0,0"
+                                       FontSize="12.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="{Binding BillingBrush}"
+                                       Text="{Binding BillingChipText}"
+                                       TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <Grid Grid.Column="1">
+        <Grid Grid.Column="1"
+              Margin="34,26,34,26">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Margin="24,20,24,0" Background="{StaticResource PanelGlassBrush}" CornerRadius="24" Padding="24,18">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock FontSize="30" FontWeight="Bold" Text="Editorial AI" />
-                        <TextBlock Margin="28,4,0,0" Foreground="{StaticResource AccentBrush}" FontSize="15" FontWeight="SemiBold" Text="Chat" />
-                        <TextBlock Margin="24,4,0,0" Foreground="{StaticResource SubtleTextBrush}" FontSize="15" Text="Analytics" />
-                        <TextBlock Margin="24,4,0,0" Foreground="{StaticResource SubtleTextBrush}" FontSize="15" Text="Keys" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Style="{StaticResource ChipBorderStyle}" Margin="0,0,12,0">
-                            <TextBlock Foreground="{Binding BillingBrush}" Text="{Binding BillingChipText}" />
-                        </Border>
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsSignedOut, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Click="OnRegisterClick" Content="Create Account" />
-                            <Button Style="{StaticResource PrimaryButtonStyle}" Click="OnLoginClick" Content="Sign In" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsAuthenticated, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Click="OnChangePasswordClick" Content="Password" />
-                            <Button Style="{StaticResource GhostButtonStyle}" Click="OnLogoutClick" Content="Log Out" />
-                        </StackPanel>
-                    </StackPanel>
-                </Grid>
-            </Border>
+            <Grid Margin="0,0,0,18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <Grid Grid.Row="1" Margin="34,28,34,26">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FrameLabelStyle}"
+                               Foreground="{StaticResource AccentBrush}"
+                               Text="PRIVATE WORKSPACE" />
+                    <TextBlock Margin="0,10,0,0"
+                               FontSize="46"
+                               FontWeight="Bold"
+                               TextWrapping="Wrap"
+                               Text="{Binding SelectedChatTitle}" />
+                    <TextBlock Margin="0,12,0,0"
+                               FontSize="18"
+                               Foreground="{StaticResource SubtleTextBrush}"
+                               TextWrapping="Wrap"
+                               Text="{Binding SelectedChatSubtitle}" />
+                </StackPanel>
+
+                <Border Grid.Column="1"
+                        MaxWidth="360"
+                        Padding="16,10"
+                        VerticalAlignment="Bottom"
+                        Style="{StaticResource ChipBorderStyle}">
+                    <TextBlock Foreground="{StaticResource SubtleTextBrush}"
+                               Text="{Binding StatusMessage}"
+                               TextWrapping="Wrap" />
+                </Border>
+            </Grid>
+
+            <Grid Grid.Row="1"
+                  Margin="0,0,0,18">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Margin="0,0,0,22">
-                    <TextBlock Style="{StaticResource FrameLabelStyle}" Foreground="{StaticResource AccentBrush}" Text="PRIVATE WORKSPACE" />
-                    <TextBlock Margin="0,12,0,0" FontSize="54" FontWeight="Bold" TextWrapping="Wrap" Text="{Binding SelectedChatTitle}" />
-                    <TextBlock Margin="0,14,0,0" FontSize="19" Foreground="{StaticResource SubtleTextBrush}" TextWrapping="Wrap" Text="{Binding SelectedChatSubtitle}" />
-                </StackPanel>
-                <Grid Grid.Row="1" Margin="0,0,0,24">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
+                <TextBlock Style="{StaticResource FrameLabelStyle}"
+                           Text="RESPONSE" />
+
+                <Grid Grid.Row="1"
+                      Margin="0,12,0,0">
+                    <Rectangle Margin="3"
+                               RadiusX="30"
+                               RadiusY="30"
+                               Stroke="{StaticResource AccentSoftBrush}"
+                               StrokeThickness="6"
+                               Opacity="0.18"
+                               IsHitTestVisible="False">
+                        <Rectangle.Effect>
+                            <BlurEffect Radius="16" />
+                        </Rectangle.Effect>
+                    </Rectangle>
+
+                    <Rectangle Margin="1.5"
+                               RadiusX="30"
+                               RadiusY="30"
+                               StrokeThickness="2.5"
+                               IsHitTestVisible="False">
+                        <Rectangle.Stroke>
+                            <LinearGradientBrush StartPoint="0,0"
+                                                 EndPoint="1,0">
+                                <GradientStop x:Name="ResponseRingStop1"
+                                              Offset="0.00"
+                                              Color="#0C5E53" />
+                                <GradientStop x:Name="ResponseRingStop2"
+                                              Offset="0.17"
+                                              Color="#7AE7D8" />
+                                <GradientStop x:Name="ResponseRingStop3"
+                                              Offset="0.34"
+                                              Color="#C8FFF8" />
+                                <GradientStop x:Name="ResponseRingStop4"
+                                              Offset="0.53"
+                                              Color="#1F8D7E" />
+                                <GradientStop x:Name="ResponseRingStop5"
+                                              Offset="0.74"
+                                              Color="#0B5A4E" />
+                                <GradientStop x:Name="ResponseRingStop6"
+                                              Offset="1.00"
+                                              Color="#8AFBF0" />
+                                <LinearGradientBrush.RelativeTransform>
+                                    <RotateTransform x:Name="ResponseRingRotate"
+                                                     CenterX="0.5"
+                                                     CenterY="0.5" />
+                                </LinearGradientBrush.RelativeTransform>
+                            </LinearGradientBrush>
+                        </Rectangle.Stroke>
+                        <Rectangle.Triggers>
+                            <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetName="ResponseRingRotate"
+                                                         Storyboard.TargetProperty="Angle"
+                                                         From="0"
+                                                         To="360"
+                                                         Duration="0:0:10" />
+                                        <ColorAnimation Storyboard.TargetName="ResponseRingStop2"
+                                                        Storyboard.TargetProperty="Color"
+                                                        From="#7AE7D8"
+                                                        To="#D2FFF9"
+                                                        Duration="0:0:2.8"
+                                                        AutoReverse="True"
+                                                        RepeatBehavior="Forever" />
+                                        <ColorAnimation Storyboard.TargetName="ResponseRingStop3"
+                                                        Storyboard.TargetProperty="Color"
+                                                        From="#C8FFF8"
+                                                        To="#74EBDD"
+                                                        Duration="0:0:3.4"
+                                                        BeginTime="0:0:0.4"
+                                                        AutoReverse="True"
+                                                        RepeatBehavior="Forever" />
+                                        <ColorAnimation Storyboard.TargetName="ResponseRingStop4"
+                                                        Storyboard.TargetProperty="Color"
+                                                        From="#1F8D7E"
+                                                        To="#8AFBF0"
+                                                        Duration="0:0:3.2"
+                                                        BeginTime="0:0:0.8"
+                                                        AutoReverse="True"
+                                                        RepeatBehavior="Forever" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Rectangle.Triggers>
+                    </Rectangle>
+
+                    <Border Margin="4"
+                            Background="{StaticResource PanelBrush}"
+                            CornerRadius="28"
+                            Padding="22,22,18,22">
+                        <Grid>
+                            <ListBox x:Name="MessagesListBox"
+                                     Padding="0,0,12,24"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ItemsSource="{Binding Messages}"
+                                     ScrollViewer.CanContentScroll="False"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:MessageItem}">
+                                        <Grid Margin="0,0,0,14">
+                                            <Border MaxWidth="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}"
+                                                    Padding="18"
+                                                    HorizontalAlignment="{Binding BubbleAlignment}"
+                                                    Background="{Binding BubbleBackground}"
+                                                    BorderBrush="{Binding BubbleBorder}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="22">
+                                                <StackPanel>
+                                                    <TextBlock FontWeight="SemiBold"
+                                                               Foreground="{Binding Foreground}"
+                                                               Text="{Binding Header}" />
+                                                    <Grid Margin="0,10,0,0">
+                                                        <TextBlock Foreground="{Binding Foreground}"
+                                                                   FontSize="15"
+                                                                   LineHeight="22"
+                                                                   TextWrapping="Wrap"
+                                                                   Text="{Binding Content}">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsStreaming}"
+                                                                                     Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <RichTextBox Background="Transparent"
+                                                                     BorderThickness="0"
+                                                                     Focusable="False"
+                                                                     IsDocumentEnabled="True"
+                                                                     IsHitTestVisible="False"
+                                                                     IsReadOnly="True"
+                                                                     HorizontalScrollBarVisibility="Disabled"
+                                                                     VerticalScrollBarVisibility="Disabled"
+                                                                     infrastructure:RichTextBoxDocumentHelper.BoundDocument="{Binding ContentDocument}">
+                                                            <RichTextBox.Style>
+                                                                <Style TargetType="RichTextBox">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsStreaming}"
+                                                                                     Value="True">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </RichTextBox.Style>
+                                                        </RichTextBox>
+                                                    </Grid>
+                                                    <TextBlock Margin="0,12,0,0"
+                                                               FontSize="12"
+                                                               Opacity="0.78"
+                                                               Foreground="{Binding Foreground}"
+                                                               Text="{Binding Timestamp}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <Grid IsHitTestVisible="{Binding IsSignedOut}">
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ElementName=MessagesListBox, Path=Items.Count}"
+                                                         Value="0">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+
+                                <StackPanel MaxWidth="640"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Visibility="{Binding IsSignedOut, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <TextBlock FontSize="44"
+                                               FontWeight="Bold"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap">
+                                        <Run Text="Sign in to open your " />
+                                        <Run Text="private workspace." Foreground="{StaticResource AccentBrush}" FontStyle="Italic" />
+                                    </TextBlock>
+                                    <TextBlock Margin="0,16,0,0"
+                                               FontSize="17"
+                                               Foreground="{StaticResource SubtleTextBrush}"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Text="Projects, chats, and monthly spend stay visible only to your account. Start with account access, then add your model key in Settings." />
+                                    <StackPanel Margin="0,24,0,0"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Center">
+                                        <Button Margin="0,0,12,0"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Click="OnRegisterClick"
+                                                Content="Create Account" />
+                                        <Button Style="{StaticResource PrimaryButtonStyle}"
+                                                Click="OnLoginClick"
+                                                Content="Sign In" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel MaxWidth="620"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Visibility="{Binding IsAuthenticated, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <TextBlock FontSize="46"
+                                               FontWeight="Bold"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap">
+                                        <Run Text="Good conversations need a " />
+                                        <Run Text="strong frame." Foreground="{StaticResource AccentBrush}" FontStyle="Italic" />
+                                    </TextBlock>
+                                    <TextBlock Margin="0,18,0,0"
+                                               FontSize="18"
+                                               Foreground="{StaticResource SubtleTextBrush}"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Text="Your response field lives here. Start a new chat on the left and everything stays inside your private workspace." />
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <StackPanel Grid.Row="2">
+                <TextBlock Style="{StaticResource FrameLabelStyle}"
+                           Text="REQUEST" />
+                <Border Margin="0,10,0,0"
+                        Padding="20"
+                        Background="{StaticResource PanelAltBrush}"
+                        BorderBrush="#223B38"
+                        BorderThickness="1"
+                        CornerRadius="28">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Style="{StaticResource FrameLabelStyle}" Text="RESPONSE" />
-                        <Border Grid.Column="1" Style="{StaticResource ChipBorderStyle}">
-                            <TextBlock Foreground="{StaticResource SubtleTextBrush}" Text="{Binding StatusMessage}" />
-                        </Border>
-                    </Grid>
 
-                    <Grid Grid.Row="1" Margin="0,12,0,0">
-                        <Rectangle Margin="3" RadiusX="30" RadiusY="30" Stroke="{StaticResource AccentSoftBrush}" StrokeThickness="6" Opacity="0.18" IsHitTestVisible="False">
-                            <Rectangle.Effect>
-                                <BlurEffect Radius="16" />
-                            </Rectangle.Effect>
-                        </Rectangle>
+                        <TextBox MinHeight="136"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Padding="2,0,10,0"
+                                 AcceptsReturn="True"
+                                 IsEnabled="{Binding IsAuthenticated}"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 KeyDown="OnDraftKeyDown"
+                                 Text="{Binding DraftMessage, UpdateSourceTrigger=PropertyChanged}" />
 
-                        <Rectangle Margin="1.5" RadiusX="30" RadiusY="30" StrokeThickness="2.5" IsHitTestVisible="False">
-                            <Rectangle.Stroke>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                    <GradientStop x:Name="ResponseRingStop1" Offset="0.00" Color="#0C5E53" />
-                                    <GradientStop x:Name="ResponseRingStop2" Offset="0.17" Color="#7AE7D8" />
-                                    <GradientStop x:Name="ResponseRingStop3" Offset="0.34" Color="#C8FFF8" />
-                                    <GradientStop x:Name="ResponseRingStop4" Offset="0.53" Color="#1F8D7E" />
-                                    <GradientStop x:Name="ResponseRingStop5" Offset="0.74" Color="#0B5A4E" />
-                                    <GradientStop x:Name="ResponseRingStop6" Offset="1.00" Color="#8AFBF0" />
-                                    <LinearGradientBrush.RelativeTransform>
-                                        <RotateTransform x:Name="ResponseRingRotate" CenterX="0.5" CenterY="0.5" />
-                                    </LinearGradientBrush.RelativeTransform>
-                                </LinearGradientBrush>
-                            </Rectangle.Stroke>
-                            <Rectangle.Triggers>
-                                <EventTrigger RoutedEvent="FrameworkElement.Loaded">
-                                    <BeginStoryboard>
-                                        <Storyboard RepeatBehavior="Forever">
-                                            <DoubleAnimation Storyboard.TargetName="ResponseRingRotate" Storyboard.TargetProperty="Angle" From="0" To="360" Duration="0:0:10" />
-                                            <ColorAnimation Storyboard.TargetName="ResponseRingStop2" Storyboard.TargetProperty="Color" From="#7AE7D8" To="#D2FFF9" Duration="0:0:2.8" AutoReverse="True" RepeatBehavior="Forever" />
-                                            <ColorAnimation Storyboard.TargetName="ResponseRingStop3" Storyboard.TargetProperty="Color" From="#C8FFF8" To="#74EBDD" Duration="0:0:3.4" BeginTime="0:0:0.4" AutoReverse="True" RepeatBehavior="Forever" />
-                                            <ColorAnimation Storyboard.TargetName="ResponseRingStop4" Storyboard.TargetProperty="Color" From="#1F8D7E" To="#8AFBF0" Duration="0:0:3.2" BeginTime="0:0:0.8" AutoReverse="True" RepeatBehavior="Forever" />
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </EventTrigger>
-                            </Rectangle.Triggers>
-                        </Rectangle>
-
-                        <Border Margin="4" Background="{StaticResource PanelBrush}" CornerRadius="28" Padding="22">
-                            <Grid>
-                                <ListBox x:Name="MessagesListBox" Padding="0,0,12,18" ItemsSource="{Binding Messages}" Background="Transparent" BorderThickness="0" ScrollViewer.CanContentScroll="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate DataType="{x:Type local:MessageItem}">
-                                            <Grid Margin="0,0,0,14">
-                                                <Border MaxWidth="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}" Padding="18" HorizontalAlignment="{Binding BubbleAlignment}" Background="{Binding BubbleBackground}" BorderBrush="{Binding BubbleBorder}" BorderThickness="1" CornerRadius="22">
-                                                    <StackPanel>
-                                                        <TextBlock FontWeight="SemiBold" Foreground="{Binding Foreground}" Text="{Binding Header}" />
-                                                        <Grid Margin="0,10,0,0">
-                                                            <TextBlock Foreground="{Binding Foreground}" FontSize="15" LineHeight="22" TextWrapping="Wrap" Text="{Binding Content}">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsStreaming}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible" />
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                            <RichTextBox Background="Transparent" BorderThickness="0" Focusable="False" IsDocumentEnabled="True" IsHitTestVisible="False" IsReadOnly="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled" infrastructure:RichTextBoxDocumentHelper.BoundDocument="{Binding ContentDocument}">
-                                                                <RichTextBox.Style>
-                                                                    <Style TargetType="RichTextBox">
-                                                                        <Setter Property="Visibility" Value="Visible" />
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsStreaming}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </RichTextBox.Style>
-                                                            </RichTextBox>
-                                                        </Grid>
-                                                        <TextBlock Margin="0,12,0,0" FontSize="12" Opacity="0.78" Foreground="{Binding Foreground}" Text="{Binding Timestamp}" />
-                                                    </StackPanel>
-                                                </Border>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-
-                                <Grid IsHitTestVisible="False">
-                                    <Grid.Style>
-                                        <Style TargetType="Grid">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ElementName=MessagesListBox, Path=Items.Count}" Value="0">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Grid.Style>
-                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="620">
-                                        <TextBlock FontSize="48" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap">
-                                            <Run Text="Good conversations need a " />
-                                            <Run Text="strong frame." Foreground="{StaticResource AccentBrush}" FontStyle="Italic" />
-                                        </TextBlock>
-                                        <TextBlock Margin="0,18,0,0" FontSize="18" Foreground="{StaticResource SubtleTextBrush}" TextAlignment="Center" TextWrapping="Wrap" Text="Your answer field lives here. Ask anything below and the conversation stays private to your account." />
-                                    </StackPanel>
-                                </Grid>
-                            </Grid>
-                        </Border>
-                    </Grid>
-                </Grid>
-
-                <StackPanel Grid.Row="2">
-                    <TextBlock Style="{StaticResource FrameLabelStyle}" Text="REQUEST" />
-                    <Border Margin="0,12,0,0" Background="{StaticResource PanelAltBrush}" BorderBrush="#223B38" BorderThickness="1" CornerRadius="28" Padding="18">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Border Background="{StaticResource PanelMutedBrush}" CornerRadius="22" Padding="10,10,12,10">
-                                <TextBox MinHeight="118" Background="Transparent" BorderThickness="0" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" KeyDown="OnDraftKeyDown" Text="{Binding DraftMessage, UpdateSourceTrigger=PropertyChanged}" />
+                        <StackPanel Grid.Column="1"
+                                    Margin="16,0,0,0"
+                                    VerticalAlignment="Bottom">
+                            <Border Margin="0,0,0,12"
+                                    Style="{StaticResource ChipBorderStyle}">
+                                <TextBlock Foreground="{StaticResource AccentBrush}"
+                                           Text="{Binding SelectedChatSubtitle}" />
                             </Border>
-                            <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Bottom">
-                                <Border Style="{StaticResource ChipBorderStyle}" Margin="0,0,0,12">
-                                    <TextBlock Foreground="{StaticResource AccentBrush}" Text="{Binding SelectedChatSubtitle}" />
-                                </Border>
-                                <Button Width="138" Height="54" Style="{StaticResource PrimaryButtonStyle}" IsEnabled="{Binding IsAuthenticated}" Click="OnSendMessageClick">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <Path Style="{StaticResource VectorIconStyle}" Stroke="#042B29" Data="{StaticResource SendIconGeometry}" />
-                                        <TextBlock Margin="8,0,0,0" Foreground="#042B29" Text="{Binding SendButtonText}" />
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                    <WrapPanel Margin="0,14,0,0" ItemHeight="34">
-                        <Border Style="{StaticResource ChipBorderStyle}" Margin="0,0,10,8">
-                            <StackPanel Orientation="Horizontal">
-                                <Ellipse Width="8" Height="8" Fill="{StaticResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                <TextBlock Text="AI engine ready" />
-                            </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource ChipBorderStyle}" Margin="0,0,10,8">
-                            <TextBlock Text="Private session" />
-                        </Border>
-                        <Border Style="{StaticResource ChipBorderStyle}" Margin="0,0,10,8">
-                            <TextBlock Foreground="{Binding BillingBrush}" Text="{Binding BillingChipText}" />
-                        </Border>
-                    </WrapPanel>
-                </StackPanel>
-            </Grid>
+                            <Button Width="138"
+                                    Height="54"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    IsEnabled="{Binding IsAuthenticated}"
+                                    Click="OnSendMessageClick">
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center">
+                                    <Path Style="{StaticResource VectorIconStyle}"
+                                          Stroke="#042B29"
+                                          Data="{StaticResource SendIconGeometry}" />
+                                    <TextBlock Margin="8,0,0,0"
+                                               Foreground="#042B29"
+                                               Text="{Binding SendButtonText}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>
-

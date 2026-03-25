@@ -19,6 +19,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <StackPanel>
@@ -42,7 +43,7 @@
                                    Text="Settings" />
                         <TextBlock Margin="0,6,0,0"
                                    Foreground="{StaticResource SubtleTextBrush}"
-                                   Text="The server address is already built into this app. Only the model API key is needed here." />
+                                   Text="The server address is already built into this app. Manage your personal model key and account actions here." />
                     </StackPanel>
                 </StackPanel>
             </StackPanel>
@@ -68,6 +69,49 @@
 
             <Border Grid.Row="2"
                     Margin="0,18,0,0"
+                    Padding="18"
+                    Background="{StaticResource PanelAltBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="18">
+                <StackPanel>
+                    <TextBlock FontWeight="SemiBold"
+                               Text="Account" />
+                    <TextBlock Margin="0,10,0,0"
+                               Text="{Binding CurrentUserStatusText}" />
+                    <TextBlock Margin="0,8,0,0"
+                               Foreground="{StaticResource SubtleTextBrush}"
+                               Text="{Binding AccountHintText}"
+                               TextWrapping="Wrap" />
+
+                    <StackPanel Margin="0,14,0,0"
+                                Orientation="Horizontal"
+                                Visibility="{Binding IsSignedOut, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Button Margin="0,0,10,0"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="OnRegisterClick"
+                                Content="Create Account" />
+                        <Button Style="{StaticResource PrimaryButtonStyle}"
+                                Click="OnLoginClick"
+                                Content="Sign In" />
+                    </StackPanel>
+
+                    <StackPanel Margin="0,14,0,0"
+                                Orientation="Horizontal"
+                                Visibility="{Binding IsAuthenticated, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Button Margin="0,0,10,0"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="OnChangePasswordClick"
+                                Content="Change Password" />
+                        <Button Style="{StaticResource GhostButtonStyle}"
+                                Click="OnLogoutClick"
+                                Content="Log Out" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="3"
+                    Margin="0,18,0,0"
                     Padding="14"
                     Background="{StaticResource AccentMutedBrush}"
                     CornerRadius="16">
@@ -81,7 +125,7 @@
                 </StackPanel>
             </Border>
 
-            <StackPanel Grid.Row="3"
+            <StackPanel Grid.Row="4"
                         Margin="0,24,0,0"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
