@@ -1,8 +1,8 @@
 {
   "name": "codex-project-bridge",
   "displayName": "GPT54 Codex",
-  "description": "A GPT54 Codex chat view in the VS Code secondary sidebar backed by your private GPT workspace server.",
-  "version": "0.6.4",
+  "description": "A GPT54 Codex chat view in the VS Code sidebar backed by your private GPT workspace server.",
+  "version": "0.6.5",
   "publisher": "photohunterd",
   "private": true,
   "license": "MIT",
@@ -25,6 +25,7 @@
   ],
   "activationEvents": [
     "onStartupFinished",
+    "onView:photohunterd.gpt54Codex.sidebar",
     "onView:photohunterd.gpt54Codex.chat",
     "onCommand:codexBridge.register",
     "onCommand:codexBridge.login",
@@ -43,6 +44,13 @@
   },
   "contributes": {
     "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "photohunterd.gpt54CodexSidebar",
+          "title": "GPT54",
+          "icon": "assets/codex-bridge.svg"
+        }
+      ],
       "secondarySidebar": [
         {
           "id": "photohunterd.gpt54Codex",
@@ -52,6 +60,13 @@
       ]
     },
     "views": {
+      "photohunterd.gpt54CodexSidebar": [
+        {
+          "type": "webview",
+          "id": "photohunterd.gpt54Codex.sidebar",
+          "name": "GPT54 Codex"
+        }
+      ],
       "photohunterd.gpt54Codex": [
         {
           "type": "webview",
@@ -63,7 +78,7 @@
     "commands": [
       {
         "command": "codexBridge.openChat",
-        "title": "GPT54 Codex: Open Tab"
+        "title": "GPT54 Codex: Open Chat"
       },
       {
         "command": "codexBridge.register",
@@ -94,6 +109,25 @@
         "title": "GPT54 Codex: Send Selection"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "codexBridge.newChat",
+          "when": "view == photohunterd.gpt54Codex.sidebar || view == photohunterd.gpt54Codex.chat",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codexBridge.configureProviderKey",
+          "when": "view == photohunterd.gpt54Codex.sidebar || view == photohunterd.gpt54Codex.chat",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codexBridge.refresh",
+          "when": "view == photohunterd.gpt54Codex.sidebar || view == photohunterd.gpt54Codex.chat",
+          "group": "navigation@3"
+        }
+      ]
+    },
     "configuration": {
       "title": "Codex Project Bridge",
       "properties": {
@@ -131,7 +165,7 @@
         "codexBridge.openOnStartup": {
           "type": "boolean",
           "default": true,
-          "description": "Open the GPT54 Codex secondary sidebar automatically after install or update."
+          "description": "Open the GPT54 Codex sidebar automatically after install or update."
         }
       }
     }

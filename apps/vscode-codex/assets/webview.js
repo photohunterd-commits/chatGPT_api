@@ -2,8 +2,6 @@ const vscode = acquireVsCodeApi();
 let state = window.__GPT54_INITIAL_STATE__ || {};
 let draft = "";
 let contextMode = "none";
-let authTab = "login";
-let showKeyForm = false;
 
 const app = document.getElementById("app");
 
@@ -77,25 +75,11 @@ function renderAuth() {
       ${renderNotice()}
       <div class="auth-card">
         <div class="auth-title">GPT54 Codex</div>
-        <div class="auth-subtitle">Sign in once, save your personal API key, and use the chat from this sidebar.</div>
-        <div class="auth-tabs">
-          <button type="button" class="tab-button ${authTab === "login" ? "active" : ""}" data-tab="login">Sign In</button>
-          <button type="button" class="tab-button ${authTab === "register" ? "active" : ""}" data-tab="register">Create Account</button>
+        <div class="auth-subtitle">Use your GPT Workspace account, then save your personal API key. The chat itself lives directly in this sidebar.</div>
+        <div class="button-row">
+          <button class="primary-button" type="button" data-command="login">Sign In</button>
+          <button class="secondary-button" type="button" data-command="register">Create Account</button>
         </div>
-        ${authTab === "login" ? `
-          <form class="form-grid" id="loginForm">
-            <input id="loginEmail" type="email" placeholder="Email" />
-            <input id="loginPassword" type="password" placeholder="Password" />
-            <button class="primary-button" type="submit">Continue</button>
-          </form>
-        ` : `
-          <form class="form-grid" id="registerForm">
-            <input id="registerName" type="text" placeholder="Display name" />
-            <input id="registerEmail" type="email" placeholder="Email" />
-            <input id="registerPassword" type="password" placeholder="Password" />
-            <button class="primary-button" type="submit">Create Account</button>
-          </form>
-        `}
       </div>
     </div>
   `;
@@ -107,14 +91,11 @@ function renderKeySetup() {
       ${renderNotice()}
       <div class="auth-card">
         <div class="auth-title">${escapeHtml(state.user?.name || "GPT Workspace")}</div>
-        <div class="auth-subtitle">Save your personal API key. The backend is already built in.</div>
-        <form class="form-grid" id="keyForm">
-          <input id="providerKey" type="password" placeholder="Paste your model API key" />
-          <div class="button-row">
-            <button class="primary-button" type="submit">Save API Key</button>
-            <button class="secondary-button" type="button" data-command="logout">Log Out</button>
-          </div>
-        </form>
+        <div class="auth-subtitle">Save your personal API key. The backend URL is already built in and hidden.</div>
+        <div class="button-row">
+          <button class="primary-button" type="button" data-command="configureProviderKey">Save API Key</button>
+          <button class="secondary-button" type="button" data-command="logout">Log Out</button>
+        </div>
       </div>
     </div>
   `;
@@ -142,45 +123,19 @@ function renderMessages() {
   `).join("");
 }
 
-function renderSummaryBar() {
-  return `
-    <div class="summary-row">
-      <div class="summary-main">
-        <div class="summary-title">${escapeHtml(state.activeChat?.title || "New chat")}</div>
-        <div class="summary-subtitle">${escapeHtml(state.user?.email || "")}</div>
-      </div>
-      <div class="summary-actions">
-        <button class="icon-button" type="button" data-command="newChat">New Chat</button>
-        <button class="icon-button" type="button" data-action="toggle-key">${showKeyForm ? "Hide Key" : "API Key"}</button>
-        <button class="icon-button" type="button" data-command="refresh">Refresh</button>
-        <button class="icon-button" type="button" data-command="logout">Log Out</button>
-      </div>
-    </div>
-  `;
-}
-
-function renderInlineKeyForm() {
-  if (!showKeyForm) {
-    return "";
-  }
-
-  return `
-    <form class="inline-key-form" id="keyForm">
-      <input id="providerKey" type="password" placeholder="Update model API key" />
-      <button class="primary-button" type="submit">Save</button>
-    </form>
-  `;
-}
-
 function renderChat() {
   return `
     <div class="chat-shell">
-      ${renderSummaryBar()}
-      ${renderInlineKeyForm()}
-      <div class="info-row">
-        <div class="info-chip">${escapeHtml(resolveModelLabel(state.activeChat?.model || state.selectedModel))}</div>
-        <div class="info-chip">${escapeHtml(state.activeChat?.reasoningEffort || state.selectedReasoningEffort || "medium")} reasoning</div>
-        <div class="info-chip">${formatRubles(state.billing?.spentRub || 0)} / ${formatRubles(state.billing?.limitRub || 0)}</div>
+      <div class="summary-row compact">
+        <div class="summary-main">
+          <div class="summary-title">${escapeHtml(state.activeChat?.title || "New chat")}</div>
+          <div class="summary-subtitle">${escapeHtml(state.user?.email || "")}</div>
+        </div>
+        <div class="summary-chips">
+          <div class="info-chip">${escapeHtml(resolveModelLabel(state.activeChat?.model || state.selectedModel))}</div>
+          <div class="info-chip">${escapeHtml(state.activeChat?.reasoningEffort || state.selectedReasoningEffort || "medium")}</div>
+          <div class="info-chip">${formatRubles(state.billing?.spentRub || 0)} / ${formatRubles(state.billing?.limitRub || 0)}</div>
+        </div>
       </div>
       ${renderNotice()}
       <section class="messages" id="messages">${renderMessages()}</section>
@@ -229,23 +184,9 @@ function render() {
     });
   }
 
-  document.querySelectorAll("[data-tab]").forEach((button) => {
-    button.addEventListener("click", () => {
-      authTab = button.getAttribute("data-tab") || "login";
-      render();
-    });
-  });
-
   document.querySelectorAll("[data-command]").forEach((button) => {
     button.addEventListener("click", () => {
       vscode.postMessage({ type: button.getAttribute("data-command") });
-    });
-  });
-
-  document.querySelectorAll("[data-action='toggle-key']").forEach((button) => {
-    button.addEventListener("click", () => {
-      showKeyForm = !showKeyForm;
-      render();
     });
   });
 
@@ -272,32 +213,6 @@ function render() {
     });
   });
 
-  document.getElementById("loginForm")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    vscode.postMessage({
-      type: "login",
-      email: document.getElementById("loginEmail")?.value || "",
-      password: document.getElementById("loginPassword")?.value || ""
-    });
-  });
-
-  document.getElementById("registerForm")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    vscode.postMessage({
-      type: "register",
-      name: document.getElementById("registerName")?.value || "",
-      email: document.getElementById("registerEmail")?.value || "",
-      password: document.getElementById("registerPassword")?.value || ""
-    });
-  });
-
-  document.getElementById("keyForm")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const apiKey = document.getElementById("providerKey")?.value || "";
-    vscode.postMessage({ type: "saveKey", apiKey });
-    showKeyForm = false;
-  });
-
   document.getElementById("sendPrompt")?.addEventListener("click", () => sendPrompt());
 
   if (shouldStickToBottom) {
@@ -320,9 +235,6 @@ window.addEventListener("message", (event) => {
   }
 
   state = payload.state;
-  if (!state.hasProviderKey) {
-    showKeyForm = true;
-  }
   render();
 });
 

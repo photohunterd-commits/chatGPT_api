@@ -2,8 +2,10 @@ import * as vscode from "vscode";
 import { BackendApi } from "./backendApi.js";
 import { CodexSidebarController, updateStatusBar } from "./homeView.js";
 
-const VIEW_CONTAINER_ID = "photohunterd.gpt54Codex";
-const VIEW_ID = "photohunterd.gpt54Codex.chat";
+const PRIMARY_VIEW_CONTAINER_ID = "photohunterd.gpt54CodexSidebar";
+const SECONDARY_VIEW_CONTAINER_ID = "photohunterd.gpt54Codex";
+const PRIMARY_VIEW_ID = "photohunterd.gpt54Codex.sidebar";
+const SECONDARY_VIEW_ID = "photohunterd.gpt54Codex.chat";
 const LAST_AUTO_OPEN_VERSION_KEY = "codexBridge.lastAutoOpenedVersion";
 
 export function activate(context: vscode.ExtensionContext) {
@@ -21,7 +23,12 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     statusBar,
-    vscode.window.registerWebviewViewProvider(VIEW_ID, sidebar, {
+    vscode.window.registerWebviewViewProvider(PRIMARY_VIEW_ID, sidebar, {
+      webviewOptions: {
+        retainContextWhenHidden: true
+      }
+    }),
+    vscode.window.registerWebviewViewProvider(SECONDARY_VIEW_ID, sidebar, {
       webviewOptions: {
         retainContextWhenHidden: true
       }
@@ -38,34 +45,37 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("codexBridge.openChat", async () => {
-      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
-      await sidebar.reveal();
+      await vscode.commands.executeCommand(`workbench.view.extension.${PRIMARY_VIEW_CONTAINER_ID}`);
+      await sidebar.reveal(PRIMARY_VIEW_ID);
       await refreshAll();
     }),
     vscode.commands.registerCommand("codexBridge.refresh", refreshAll),
     vscode.commands.registerCommand("codexBridge.newChat", async () => {
-      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
-      await sidebar.reveal();
+      await vscode.commands.executeCommand(`workbench.view.extension.${PRIMARY_VIEW_CONTAINER_ID}`);
+      await sidebar.reveal(PRIMARY_VIEW_ID);
       await sidebar.startNewChat();
       await refreshAll();
     }),
     vscode.commands.registerCommand("codexBridge.sendSelection", async () => {
-      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
-      await sidebar.reveal();
+      await vscode.commands.executeCommand(`workbench.view.extension.${PRIMARY_VIEW_CONTAINER_ID}`);
+      await sidebar.reveal(PRIMARY_VIEW_ID);
       await sidebar.sendSelectionToChat();
       await refreshAll();
     }),
     vscode.commands.registerCommand("codexBridge.login", async () => {
-      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
-      await sidebar.reveal();
+      await vscode.commands.executeCommand(`workbench.view.extension.${PRIMARY_VIEW_CONTAINER_ID}`);
+      await sidebar.reveal(PRIMARY_VIEW_ID);
+      await sidebar.promptLogin();
     }),
     vscode.commands.registerCommand("codexBridge.register", async () => {
-      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
-      await sidebar.reveal();
+      await vscode.commands.executeCommand(`workbench.view.extension.${PRIMARY_VIEW_CONTAINER_ID}`);
+      await sidebar.reveal(PRIMARY_VIEW_ID);
+      await sidebar.promptRegister();
     }),
     vscode.commands.registerCommand("codexBridge.configureProviderKey", async () => {
-      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
-      await sidebar.reveal();
+      await vscode.commands.executeCommand(`workbench.view.extension.${PRIMARY_VIEW_CONTAINER_ID}`);
+      await sidebar.reveal(PRIMARY_VIEW_ID);
+      await sidebar.promptProviderKey();
     }),
     vscode.commands.registerCommand("codexBridge.logout", async () => {
       await sidebar.logout();
@@ -100,8 +110,10 @@ async function revealOnFirstStartup(
   }
 
   try {
-    await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
-    await sidebar.reveal();
+    await vscode.commands.executeCommand(`workbench.view.extension.${PRIMARY_VIEW_CONTAINER_ID}`);
+    await sidebar.reveal(PRIMARY_VIEW_ID);
+    await vscode.commands.executeCommand(`workbench.view.extension.${SECONDARY_VIEW_CONTAINER_ID}`);
+    await sidebar.reveal(SECONDARY_VIEW_ID);
     await refreshAll();
     await context.globalState.update(LAST_AUTO_OPEN_VERSION_KEY, currentVersion);
   } catch {

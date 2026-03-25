@@ -20,6 +20,8 @@ import {
 
 const BRIDGE_PROJECT_NAME = "Codex";
 const BRIDGE_PROJECT_DESCRIPTION = "Internal workspace used by the VS Code GPT54 Codex chat tab.";
+const PRIMARY_VIEW_ID = "photohunterd.gpt54Codex.sidebar";
+const SECONDARY_VIEW_ID = "photohunterd.gpt54Codex.chat";
 
 function escapeHtmlText(value: string) {
   return value
@@ -96,7 +98,7 @@ type WebviewMessage =
   | { type: "sendPrompt"; prompt?: string; contextMode?: ContextMode };
 
 export class CodexSidebarController implements vscode.WebviewViewProvider {
-  private view?: vscode.WebviewView;
+  private readonly views = new Map<string, vscode.WebviewView>();
   private isBusy = false;
   private statusMessage = "";
   private statusTone: PanelState["statusTone"] = "info";
@@ -108,7 +110,8 @@ export class CodexSidebarController implements vscode.WebviewViewProvider {
   ) {}
 
   async resolveWebviewView(webviewView: vscode.WebviewView) {
-    this.view = webviewView;
+    const viewId = webviewView.viewType;
+    this.views.set(viewId, webviewView);
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "assets")]
@@ -118,9 +121,7 @@ export class CodexSidebarController implements vscode.WebviewViewProvider {
       void this.handleMessage(message);
     }, undefined, this.context.subscriptions);
     webviewView.onDidDispose(() => {
-      if (this.view === webviewView) {
-        this.view = undefined;
-      }
+      this.views.delete(viewId);
     });
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
@@ -131,8 +132,11 @@ export class CodexSidebarController implements vscode.WebviewViewProvider {
     await this.pushSnapshot();
   }
 
-  async reveal() {
-    this.view?.show?.(true);
+  async reveal(preferredViewId?: string) {
+    const preferredView = preferredViewId ? this.views.get(preferredViewId) : undefined;
+    const visibleView = [...this.views.values()].find((view) => view.visible);
+    const fallbackView = preferredView ?? visibleView ?? this.views.get(PRIMARY_VIEW_ID) ?? this.views.get(SECONDARY_VIEW_ID);
+    fallbackView?.show?.(true);
     await this.pushSnapshot();
   }
 
@@ -158,6 +162,84 @@ export class CodexSidebarController implements vscode.WebviewViewProvider {
     await this.sendPrompt("", "selection");
   }
 
+  async promptLogin() {
+    const email = await vscode.window.showInputBox({
+      title: "GPT54 Codex",
+      prompt: "Enter your account email",
+      placeHolder: "you@example.com",
+      ignoreFocusOut: true
+    });
+
+    if (!email?.trim()) {
+      return;
+    }
+
+    const password = await vscode.window.showInputBox({
+      title: "GPT54 Codex",
+      prompt: "Enter your password",
+      password: true,
+      ignoreFocusOut: true
+    });
+
+    if (!password) {
+      return;
+    }
+
+    await this.login(email.trim(), password);
+  }
+
+  async promptRegister() {
+    const name = await vscode.window.showInputBox({
+      title: "GPT54 Codex",
+      prompt: "Display name",
+      placeHolder: "Alex",
+      ignoreFocusOut: true
+    });
+
+    if (!name?.trim()) {
+      return;
+    }
+
+    const email = await vscode.window.showInputBox({
+      title: "GPT54 Codex",
+      prompt: "Email",
+      placeHolder: "you@example.com",
+      ignoreFocusOut: true
+    });
+
+    if (!email?.trim()) {
+      return;
+    }
+
+    const password = await vscode.window.showInputBox({
+      title: "GPT54 Codex",
+      prompt: "Create a password",
+      password: true,
+      ignoreFocusOut: true
+    });
+
+    if (!password) {
+      return;
+    }
+
+    await this.register(name.trim(), email.trim(), password);
+  }
+
+  async promptProviderKey() {
+    const apiKey = await vscode.window.showInputBox({
+      title: "GPT54 Codex",
+      prompt: "Paste your personal model API key",
+      password: true,
+      ignoreFocusOut: true
+    });
+
+    if (!apiKey?.trim()) {
+      return;
+    }
+
+    await this.saveKey(apiKey.trim());
+  }
+
   private async handleMessage(message: WebviewMessage) {
     try {
       switch (message.type) {
@@ -166,13 +248,25 @@ export class CodexSidebarController implements vscode.WebviewViewProvider {
           await this.pushSnapshot();
           return;
         case "login":
-          await this.login(message.email ?? "", message.password ?? "");
+          if ((message.email ?? "").trim() || (message.password ?? "").trim()) {
+            await this.login(message.email ?? "", message.password ?? "");
+          } else {
+            await this.promptLogin();
+          }
           return;
         case "register":
-          await this.register(message.name ?? "", message.email ?? "", message.password ?? "");
+          if ((message.name ?? "").trim() || (message.email ?? "").trim() || (message.password ?? "").trim()) {
+            await this.register(message.name ?? "", message.email ?? "", message.password ?? "");
+          } else {
+            await this.promptRegister();
+          }
           return;
         case "saveKey":
-          await this.saveKey(message.apiKey ?? "");
+          if ((message.apiKey ?? "").trim()) {
+            await this.saveKey(message.apiKey ?? "");
+          } else {
+            await this.promptProviderKey();
+          }
           return;
         case "updatePreferences":
           await this.updatePreferences(message.model, message.reasoningEffort);
@@ -378,14 +472,16 @@ export class CodexSidebarController implements vscode.WebviewViewProvider {
   private async postSnapshot(state: PanelState) {
     this.lastState = state;
 
-    if (!this.view || !this.view.visible) {
+    const targetViews = [...this.views.values()].filter((view) => view.visible);
+
+    if (targetViews.length === 0) {
       return;
     }
 
-    await this.view.webview.postMessage({
+    await Promise.all(targetViews.map((view) => view.webview.postMessage({
       type: "snapshot",
       state
-    });
+    })));
   }
 }
 

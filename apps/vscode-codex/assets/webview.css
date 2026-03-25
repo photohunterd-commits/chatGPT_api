@@ -123,6 +123,10 @@ button:disabled {
   gap: 10px;
 }
 
+.summary-row.compact {
+  padding: 2px 2px 0;
+}
+
 .summary-main {
   min-width: 0;
 }
@@ -142,10 +146,8 @@ button:disabled {
   text-overflow: ellipsis;
 }
 
-.summary-actions,
 .button-row,
-.auth-tabs,
-.info-row,
+.summary-chips,
 .composer-top,
 .composer-left,
 .composer-bottom {
@@ -154,7 +156,7 @@ button:disabled {
   align-items: center;
 }
 
-.summary-actions,
+.summary-chips,
 .composer-left {
   flex-wrap: wrap;
 }
@@ -379,16 +381,6 @@ button:disabled {
 .auth-subtitle {
   color: var(--muted);
   margin-bottom: 12px;
-}
-
-.form-grid,
-.inline-key-form {
-  display: grid;
-  gap: 8px;
-}
-
-.inline-key-form {
-  grid-template-columns: 1fr auto;
 }
 
 .messages::-webkit-scrollbar,
