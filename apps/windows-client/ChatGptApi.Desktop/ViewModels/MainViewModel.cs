@@ -657,12 +657,12 @@ public sealed class ChatItem
 
 public sealed class MessageItem : ObservableObject
 {
-    private static readonly Brush AssistantBackground = new SolidColorBrush(Color.FromRgb(24, 31, 41));
-    private static readonly Brush AssistantBorder = new SolidColorBrush(Color.FromRgb(42, 55, 70));
-    private static readonly Brush AssistantForeground = new SolidColorBrush(Color.FromRgb(236, 240, 244));
-    private static readonly Brush UserBackground = new SolidColorBrush(Color.FromRgb(17, 75, 58));
-    private static readonly Brush UserBorder = new SolidColorBrush(Color.FromRgb(29, 108, 82));
-    private static readonly Brush UserForeground = new SolidColorBrush(Color.FromRgb(244, 250, 247));
+    private static readonly Brush AssistantBackground = new SolidColorBrush(Color.FromRgb(18, 24, 29));
+    private static readonly Brush AssistantBorder = new SolidColorBrush(Color.FromRgb(28, 42, 45));
+    private static readonly Brush AssistantForeground = new SolidColorBrush(Color.FromRgb(236, 243, 245));
+    private static readonly Brush UserBackground = new SolidColorBrush(Color.FromRgb(13, 43, 40));
+    private static readonly Brush UserBorder = new SolidColorBrush(Color.FromRgb(26, 87, 79));
+    private static readonly Brush UserForeground = new SolidColorBrush(Color.FromRgb(241, 251, 248));
     private FlowDocument _contentDocument = new();
     private string _content = string.Empty;
     private bool _isStreaming;
