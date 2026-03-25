@@ -2,7 +2,7 @@
   "name": "codex-project-bridge",
   "displayName": "GPT54 Codex",
   "description": "A GPT54 Codex chat view in the VS Code secondary sidebar backed by your private GPT workspace server.",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "publisher": "photohunterd",
   "private": true,
   "license": "MIT",
@@ -24,6 +24,7 @@
     "AI"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onView:photohunterd.gpt54Codex.chat",
     "onCommand:codexBridge.register",
     "onCommand:codexBridge.login",
@@ -126,6 +127,11 @@
             "xhigh"
           ],
           "description": "Reasoning depth for the next new GPT54 Codex chat."
+        },
+        "codexBridge.openOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open the GPT54 Codex secondary sidebar automatically after install or update."
         }
       }
     }

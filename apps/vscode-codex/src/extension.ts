@@ -4,6 +4,7 @@ import { CodexSidebarController, updateStatusBar } from "./homeView.js";
 
 const VIEW_CONTAINER_ID = "photohunterd.gpt54Codex";
 const VIEW_ID = "photohunterd.gpt54Codex.chat";
+const LAST_AUTO_OPEN_VERSION_KEY = "codexBridge.lastAutoOpenedVersion";
 
 export function activate(context: vscode.ExtensionContext) {
   const api = new BackendApi(context);
@@ -71,8 +72,39 @@ export function activate(context: vscode.ExtensionContext) {
       await refreshAll();
     })
   );
+
+  void revealOnFirstStartup(context, sidebar, refreshAll);
 }
 
 export function deactivate() {
   return undefined;
+}
+
+async function revealOnFirstStartup(
+  context: vscode.ExtensionContext,
+  sidebar: CodexSidebarController,
+  refreshAll: () => Promise<void>
+) {
+  const configuration = vscode.workspace.getConfiguration("codexBridge");
+  const openOnStartup = configuration.get<boolean>("openOnStartup", true);
+
+  if (!openOnStartup) {
+    return;
+  }
+
+  const currentVersion = String(context.extension.packageJSON.version ?? "");
+  const lastAutoOpenedVersion = context.globalState.get<string>(LAST_AUTO_OPEN_VERSION_KEY);
+
+  if (!currentVersion || lastAutoOpenedVersion === currentVersion) {
+    return;
+  }
+
+  try {
+    await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
+    await sidebar.reveal();
+    await refreshAll();
+    await context.globalState.update(LAST_AUTO_OPEN_VERSION_KEY, currentVersion);
+  } catch {
+    return;
+  }
 }
