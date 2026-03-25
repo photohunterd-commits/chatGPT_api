@@ -1,11 +1,9 @@
 const vscode = acquireVsCodeApi();
 let state = window.__GPT54_INITIAL_STATE__ || {};
-const MODEL_LABEL = window.__GPT54_MODEL_LABEL__ || "GPT-5.3 Codex";
-const MODEL_REASONING = window.__GPT54_MODEL_REASONING__ || "medium";
 let draft = "";
 let contextMode = "none";
 let authTab = "login";
-let viewMode = "chat";
+let showKeyForm = false;
 
 const app = document.getElementById("app");
 
@@ -30,7 +28,7 @@ function formatTime(value) {
 function resolveModelLabel(model) {
   return state.availableModels?.find((item) => String(item.model).toLowerCase() === String(model || "").toLowerCase())?.label
     || model
-    || MODEL_LABEL;
+    || "GPT-5.3 Codex";
 }
 
 function renderModelOptions() {
@@ -53,16 +51,16 @@ function isNearBottom() {
     return true;
   }
 
-  return messages.scrollHeight - messages.scrollTop - messages.clientHeight < 72;
+  return messages.scrollHeight - messages.scrollTop - messages.clientHeight < 80;
 }
 
-function scrollToBottom() {
+function scrollToBottom(behavior = "smooth") {
   const messages = document.getElementById("messages");
   if (!messages) {
     return;
   }
 
-  messages.scrollTo({ top: messages.scrollHeight, behavior: "smooth" });
+  messages.scrollTo({ top: messages.scrollHeight, behavior });
 }
 
 function renderNotice() {
@@ -70,58 +68,54 @@ function renderNotice() {
     return "";
   }
 
-  return `<section class="notice ${state.statusTone || "info"}">${escapeHtml(state.statusMessage)}</section>`;
+  return `<div class="notice ${state.statusTone || "info"}">${escapeHtml(state.statusMessage)}</div>`;
 }
 
 function renderAuth() {
   return `
-    <div class="shell">
+    <div class="auth-shell">
       ${renderNotice()}
-      <section class="auth-shell">
-        <div class="auth-card">
-          <h1>GPT54 Codex for VS Code</h1>
-          <p>Open one tab, sign in once, add your personal API key, and chat with your code without any @-commands.</p>
-          <div class="tabs">
-            <button type="button" class="${authTab === "login" ? "primary" : ""}" data-tab="login">Sign In</button>
-            <button type="button" class="${authTab === "register" ? "primary" : ""}" data-tab="register">Create Account</button>
-          </div>
-          ${authTab === "login" ? `
-            <form class="form-grid" id="loginForm">
-              <input id="loginEmail" type="email" placeholder="Email" />
-              <input id="loginPassword" type="password" placeholder="Password" />
-              <button class="primary" type="submit">Continue</button>
-            </form>
-          ` : `
-            <form class="form-grid" id="registerForm">
-              <input id="registerName" type="text" placeholder="Display name" />
-              <input id="registerEmail" type="email" placeholder="Email" />
-              <input id="registerPassword" type="password" placeholder="Password" />
-              <button class="primary" type="submit">Create Account</button>
-            </form>
-          `}
+      <div class="auth-card">
+        <div class="auth-title">GPT54 Codex</div>
+        <div class="auth-subtitle">Sign in once, save your personal API key, and use the chat from this sidebar.</div>
+        <div class="auth-tabs">
+          <button type="button" class="tab-button ${authTab === "login" ? "active" : ""}" data-tab="login">Sign In</button>
+          <button type="button" class="tab-button ${authTab === "register" ? "active" : ""}" data-tab="register">Create Account</button>
         </div>
-      </section>
+        ${authTab === "login" ? `
+          <form class="form-grid" id="loginForm">
+            <input id="loginEmail" type="email" placeholder="Email" />
+            <input id="loginPassword" type="password" placeholder="Password" />
+            <button class="primary-button" type="submit">Continue</button>
+          </form>
+        ` : `
+          <form class="form-grid" id="registerForm">
+            <input id="registerName" type="text" placeholder="Display name" />
+            <input id="registerEmail" type="email" placeholder="Email" />
+            <input id="registerPassword" type="password" placeholder="Password" />
+            <button class="primary-button" type="submit">Create Account</button>
+          </form>
+        `}
+      </div>
     </div>
   `;
 }
 
 function renderKeySetup() {
   return `
-    <div class="shell">
+    <div class="auth-shell">
       ${renderNotice()}
-      <section class="auth-shell">
-        <div class="auth-card">
-          <h1>${escapeHtml(state.user?.name || "GPT Workspace")} is signed in</h1>
-          <p>Add your personal model API key once. The backend is already built in, so nothing else needs to be configured.</p>
-          <form class="form-grid" id="keyForm" style="margin-top:16px;">
-            <input id="providerKey" type="password" placeholder="Paste your model API key" />
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="primary" type="submit">Save API Key</button>
-              <button class="ghost" type="button" data-command="logout">Log Out</button>
-            </div>
-          </form>
-        </div>
-      </section>
+      <div class="auth-card">
+        <div class="auth-title">${escapeHtml(state.user?.name || "GPT Workspace")}</div>
+        <div class="auth-subtitle">Save your personal API key. The backend is already built in.</div>
+        <form class="form-grid" id="keyForm">
+          <input id="providerKey" type="password" placeholder="Paste your model API key" />
+          <div class="button-row">
+            <button class="primary-button" type="submit">Save API Key</button>
+            <button class="secondary-button" type="button" data-command="logout">Log Out</button>
+          </div>
+        </form>
+      </div>
     </div>
   `;
 }
@@ -129,86 +123,97 @@ function renderKeySetup() {
 function renderMessages() {
   if (!state.messages?.length) {
     return `
-      <div class="empty">
-        <strong>Start a new coding thread</strong>
-        The first prompt creates a hidden backend chat automatically. Use Selection or File when you want GPT54 Codex to see code from the current editor.
+      <div class="empty-state">
+        <div class="empty-title">Start a new coding thread</div>
+        <div class="empty-copy">Write a prompt below. The first send creates a hidden backend chat automatically.</div>
       </div>
     `;
   }
 
   return state.messages.map((message) => `
     <article class="message ${message.role.toLowerCase() === "assistant" ? "assistant" : "user"}">
-      <div class="message-head">
+      <div class="message-meta">
         <span class="message-author">${message.role.toLowerCase() === "assistant" ? "GPT54" : "You"}</span>
-        <span>${escapeHtml(formatTime(message.createdAt))}</span>
+        <span class="message-time">${escapeHtml(formatTime(message.createdAt))}</span>
       </div>
       <div class="message-body">${message.contentHtml}</div>
-      ${message.isStreaming ? '<div class="spinner" style="margin-top:10px;"><span></span><span></span><span></span></div>' : ""}
+      ${message.isStreaming ? '<div class="typing-row"><span></span><span></span><span></span></div>' : ""}
     </article>
   `).join("");
 }
 
+function renderSummaryBar() {
+  return `
+    <div class="summary-row">
+      <div class="summary-main">
+        <div class="summary-title">${escapeHtml(state.activeChat?.title || "New chat")}</div>
+        <div class="summary-subtitle">${escapeHtml(state.user?.email || "")}</div>
+      </div>
+      <div class="summary-actions">
+        <button class="icon-button" type="button" data-command="newChat">New Chat</button>
+        <button class="icon-button" type="button" data-action="toggle-key">${showKeyForm ? "Hide Key" : "API Key"}</button>
+        <button class="icon-button" type="button" data-command="refresh">Refresh</button>
+        <button class="icon-button" type="button" data-command="logout">Log Out</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderInlineKeyForm() {
+  if (!showKeyForm) {
+    return "";
+  }
+
+  return `
+    <form class="inline-key-form" id="keyForm">
+      <input id="providerKey" type="password" placeholder="Update model API key" />
+      <button class="primary-button" type="submit">Save</button>
+    </form>
+  `;
+}
+
 function renderChat() {
   return `
-    <div class="shell">
-      <header class="topbar">
-        <div class="brand">
-          <div class="brand-title">
-            <span class="brand-mark">◎</span>
-            <span>GPT54 Codex</span>
-          </div>
-          <div class="brand-subtitle">${escapeHtml(state.activeChat?.title || "Fresh coding chat")} · ${escapeHtml(state.user?.email || "")}</div>
-        </div>
-        <div class="topbar-actions">
-          <button type="button" data-command="newChat">New Chat</button>
-          <button type="button" data-action="key">API Key</button>
-          <button type="button" data-command="refresh">Refresh</button>
-          <button class="ghost" type="button" data-command="logout">Log Out</button>
-        </div>
-      </header>
-      <section class="chip-row">
-        <div class="chip"><strong>${escapeHtml(resolveModelLabel(state.activeChat?.model || state.selectedModel))}</strong><span>${escapeHtml(state.activeChat?.reasoningEffort || state.selectedReasoningEffort || MODEL_REASONING)} reasoning</span></div>
-        <div class="chip"><strong>This month</strong><span>${formatRubles(state.billing?.spentRub || 0)} / ${formatRubles(state.billing?.limitRub || 0)}</span></div>
-        <div class="chip"><strong>Context</strong><span>${escapeHtml(state.activeEditorLabel || "Open a file to attach code context")}</span></div>
-      </section>
-      ${renderNotice()}
-      <div class="conversation">
-        <section class="messages" id="messages">${renderMessages()}</section>
-        <section class="composer">
-          <div class="composer-row" style="margin-top:0; margin-bottom:10px;">
-            <div class="mode-row" style="flex:1; min-width:0;">
-              <select id="modelSelect" style="min-width:240px; flex:1;">
-                ${renderModelOptions()}
-              </select>
-              <select id="reasoningSelect" style="min-width:150px;">
-                ${renderReasoningOptions()}
-              </select>
-            </div>
-            <div class="composer-hint" style="margin:0;">Changing these starts a new chat on the next send.</div>
-          </div>
-          <textarea id="prompt" placeholder="Ask a coding question, describe what to build, or continue the thread"></textarea>
-          <div class="composer-row">
-            <div class="mode-row">
-              <button type="button" class="mode-button ${contextMode === "none" ? "active" : ""}" data-context="none">Chat</button>
-              <button type="button" class="mode-button ${contextMode === "selection" ? "active" : ""}" data-context="selection" ${state.canUseEditorContext ? "" : "disabled"}>Selection</button>
-              <button type="button" class="mode-button ${contextMode === "file" ? "active" : ""}" data-context="file" ${state.canUseEditorContext ? "" : "disabled"}>File</button>
-            </div>
-            <button id="sendPrompt" class="primary" type="button" ${state.isBusy ? "disabled" : ""}>${state.isBusy ? "Thinking..." : "Send"}</button>
-          </div>
-          <div class="composer-hint">Press Ctrl+Enter to send. Replies stream live from ${escapeHtml(resolveModelLabel(state.selectedModel))}.</div>
-        </section>
+    <div class="chat-shell">
+      ${renderSummaryBar()}
+      ${renderInlineKeyForm()}
+      <div class="info-row">
+        <div class="info-chip">${escapeHtml(resolveModelLabel(state.activeChat?.model || state.selectedModel))}</div>
+        <div class="info-chip">${escapeHtml(state.activeChat?.reasoningEffort || state.selectedReasoningEffort || "medium")} reasoning</div>
+        <div class="info-chip">${formatRubles(state.billing?.spentRub || 0)} / ${formatRubles(state.billing?.limitRub || 0)}</div>
       </div>
+      ${renderNotice()}
+      <section class="messages" id="messages">${renderMessages()}</section>
+      <section class="composer">
+        <div class="composer-top">
+          <select id="modelSelect">${renderModelOptions()}</select>
+          <select id="reasoningSelect">${renderReasoningOptions()}</select>
+        </div>
+        <textarea id="prompt" placeholder="Ask a coding question, describe what to build, or continue the thread"></textarea>
+        <div class="composer-bottom">
+          <div class="composer-left">
+            <button type="button" class="mode-button ${contextMode === "none" ? "active" : ""}" data-context="none">Chat</button>
+            <button type="button" class="mode-button ${contextMode === "selection" ? "active" : ""}" data-context="selection" ${state.canUseEditorContext ? "" : "disabled"}>Selection</button>
+            <button type="button" class="mode-button ${contextMode === "file" ? "active" : ""}" data-context="file" ${state.canUseEditorContext ? "" : "disabled"}>File</button>
+            <span class="composer-hint">${escapeHtml(state.activeEditorLabel || "Open a file to attach code context")}</span>
+          </div>
+          <button id="sendPrompt" class="send-button" type="button" ${state.isBusy ? "disabled" : ""}>${state.isBusy ? "Thinking..." : "Send"}</button>
+        </div>
+      </section>
     </div>
   `;
 }
 
 function render() {
   const shouldStickToBottom = isNearBottom() || state.isBusy;
-  app.innerHTML = !state.hasSession
-    ? renderAuth()
-    : (!state.hasProviderKey || viewMode === "key")
-      ? renderKeySetup()
-      : renderChat();
+
+  if (!state.hasSession) {
+    app.innerHTML = renderAuth();
+  } else if (!state.hasProviderKey) {
+    app.innerHTML = renderKeySetup();
+  } else {
+    app.innerHTML = renderChat();
+  }
 
   const prompt = document.getElementById("prompt");
   if (prompt) {
@@ -237,9 +242,9 @@ function render() {
     });
   });
 
-  document.querySelectorAll("[data-action='key']").forEach((button) => {
+  document.querySelectorAll("[data-action='toggle-key']").forEach((button) => {
     button.addEventListener("click", () => {
-      viewMode = "key";
+      showKeyForm = !showKeyForm;
       render();
     });
   });
@@ -290,7 +295,7 @@ function render() {
     event.preventDefault();
     const apiKey = document.getElementById("providerKey")?.value || "";
     vscode.postMessage({ type: "saveKey", apiKey });
-    viewMode = "chat";
+    showKeyForm = false;
   });
 
   document.getElementById("sendPrompt")?.addEventListener("click", () => sendPrompt());
@@ -316,9 +321,7 @@ window.addEventListener("message", (event) => {
 
   state = payload.state;
   if (!state.hasProviderKey) {
-    viewMode = "key";
-  } else if (viewMode === "key" && state.hasProviderKey) {
-    viewMode = "chat";
+    showKeyForm = true;
   }
   render();
 });

@@ -1,8 +1,8 @@
 {
   "name": "codex-project-bridge",
   "displayName": "GPT54 Codex",
-  "description": "A right-side GPT54 Codex chat tab for VS Code backed by your private GPT workspace server.",
-  "version": "0.6.1",
+  "description": "A GPT54 Codex chat view in the VS Code secondary sidebar backed by your private GPT workspace server.",
+  "version": "0.6.2",
   "publisher": "photohunterd",
   "private": true,
   "license": "MIT",
@@ -18,13 +18,13 @@
     "LICENSE.txt"
   ],
   "engines": {
-    "vscode": "^1.102.0"
+    "vscode": "^1.106.0"
   },
   "categories": [
     "AI"
   ],
   "activationEvents": [
-    "onStartupFinished",
+    "onView:photohunterd.gpt54Codex.chat",
     "onCommand:codexBridge.register",
     "onCommand:codexBridge.login",
     "onCommand:codexBridge.logout",
@@ -41,6 +41,24 @@
     "package": "npm run build && vsce package --no-yarn --no-dependencies"
   },
   "contributes": {
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "photohunterd.gpt54Codex",
+          "title": "GPT54",
+          "icon": "assets/codex-bridge.svg"
+        }
+      ]
+    },
+    "views": {
+      "photohunterd.gpt54Codex": [
+        {
+          "type": "webview",
+          "id": "photohunterd.gpt54Codex.chat",
+          "name": "GPT54 Codex"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "codexBridge.openChat",

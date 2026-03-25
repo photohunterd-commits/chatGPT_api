@@ -18,9 +18,6 @@ import {
   type User
 } from "./types.js";
 
-const PANEL_VIEW_TYPE = "photohunterd.gpt54Codex.panel";
-const PANEL_TITLE = "GPT54 Codex";
-const AUTO_OPEN_VERSION_KEY = "codexBridge.autoOpenedVersion";
 const BRIDGE_PROJECT_NAME = "Codex";
 const BRIDGE_PROJECT_DESCRIPTION = "Internal workspace used by the VS Code GPT54 Codex chat tab.";
 
@@ -98,63 +95,45 @@ type WebviewMessage =
   | { type: "updatePreferences"; model?: string; reasoningEffort?: ReasoningEffort }
   | { type: "sendPrompt"; prompt?: string; contextMode?: ContextMode };
 
-export class CodexPanelController {
-  private panel?: vscode.WebviewPanel;
+export class CodexSidebarController implements vscode.WebviewViewProvider {
+  private view?: vscode.WebviewView;
   private isBusy = false;
   private statusMessage = "";
   private statusTone: PanelState["statusTone"] = "info";
+  private lastState?: PanelState;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly api: BackendApi
   ) {}
 
-  async open(options?: { preserveFocus?: boolean }) {
-    if (this.panel) {
-      this.panel.reveal(vscode.ViewColumn.Beside, options?.preserveFocus ?? false);
-      await this.pushSnapshot();
-      return;
-    }
-
-    const panel = vscode.window.createWebviewPanel(
-      PANEL_VIEW_TYPE,
-      PANEL_TITLE,
-      {
-        viewColumn: vscode.ViewColumn.Beside,
-        preserveFocus: options?.preserveFocus ?? false
-      },
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "assets")]
-      }
-    );
-
-    panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, "assets", "codex-bridge.svg");
-    panel.webview.html = renderHtml(panel.webview, this.context.extensionUri);
-    panel.webview.onDidReceiveMessage((message: WebviewMessage) => {
+  async resolveWebviewView(webviewView: vscode.WebviewView) {
+    this.view = webviewView;
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "assets")]
+    };
+    webviewView.webview.html = renderHtml(webviewView.webview, this.context.extensionUri);
+    webviewView.webview.onDidReceiveMessage((message: WebviewMessage) => {
       void this.handleMessage(message);
     }, undefined, this.context.subscriptions);
-    panel.onDidDispose(() => {
-      if (this.panel === panel) {
-        this.panel = undefined;
+    webviewView.onDidDispose(() => {
+      if (this.view === webviewView) {
+        this.view = undefined;
       }
-    }, undefined, this.context.subscriptions);
+    });
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) {
+        void this.pushSnapshot();
+      }
+    });
 
-    this.panel = panel;
     await this.pushSnapshot();
   }
 
-  async autoOpenOncePerVersion() {
-    const currentVersion = String(this.context.extension.packageJSON.version ?? "");
-    const openedVersion = this.context.globalState.get<string>(AUTO_OPEN_VERSION_KEY);
-
-    if (!currentVersion || openedVersion === currentVersion) {
-      return;
-    }
-
-    await this.open({ preserveFocus: true });
-    await this.context.globalState.update(AUTO_OPEN_VERSION_KEY, currentVersion);
+  async reveal() {
+    this.view?.show?.(true);
+    await this.pushSnapshot();
   }
 
   async refresh() {
@@ -176,7 +155,6 @@ export class CodexPanelController {
   }
 
   async sendSelectionToChat() {
-    await this.open();
     await this.sendPrompt("", "selection");
   }
 
@@ -298,56 +276,51 @@ export class CodexPanelController {
     );
 
     this.isBusy = true;
-    this.setStatus(`Streaming reply from ${resolveModelLabel(chat.model, state.availableModels)}...`, "info");
+    this.setStatus(`Sending request to ${resolveModelLabel(chat.model, state.availableModels)}...`, "info");
     state = {
       ...state,
+      activeChat: chat,
+      messages: state.activeChat?.id === chat.id ? state.messages : [],
       isBusy: true,
       statusMessage: this.statusMessage,
       statusTone: this.statusTone
     };
 
-    if (!state.activeChat || state.activeChat.id !== chat.id) {
-      state.activeChat = chat;
-      state.messages = [];
-    }
-
+    const optimisticUserMessage: PanelMessage = {
+      id: `local-user-${Date.now()}`,
+      role: "user",
+      createdAt: new Date().toISOString(),
+      content: payload.metadata.contextMode === "none" ? prompt.trim() : payload.titleSeed,
+      contentHtml: renderMarkdown(payload.metadata.contextMode === "none" ? prompt.trim() : prompt.trim() || payload.titleSeed)
+    };
     const streamingMessageId = `streaming-${Date.now()}`;
-    let streamingMessage: PanelMessage | undefined;
+    let streamingMessage: PanelMessage = {
+      id: streamingMessageId,
+      role: "assistant",
+      createdAt: new Date().toISOString(),
+      content: "",
+      contentHtml: renderMarkdown(""),
+      isStreaming: true
+    };
+    state.messages = [...state.messages, optimisticUserMessage, streamingMessage];
     await this.postSnapshot(state);
 
     try {
       for await (const event of this.api.streamMessage(chat.id, payload.content, payload.metadata)) {
         if (event.type === "start") {
+          this.setStatus(`Streaming reply from ${resolveModelLabel(chat.model, state.availableModels)}...`, "info");
+          state.statusMessage = this.statusMessage;
+          state.statusTone = this.statusTone;
+
           if (event.userMessage) {
-            state.messages = [...state.messages, toPanelMessage(event.userMessage)];
+            state.messages = replaceMessage(state.messages, toPanelMessage(event.userMessage), optimisticUserMessage.id);
           }
 
-          streamingMessage = {
-            id: streamingMessageId,
-            role: "assistant",
-            createdAt: new Date().toISOString(),
-            content: "",
-            contentHtml: renderMarkdown(""),
-            isStreaming: true
-          };
-          state.messages = [...state.messages, streamingMessage];
           await this.postSnapshot(state);
           continue;
         }
 
         if (event.type === "delta") {
-          if (!streamingMessage) {
-            streamingMessage = {
-              id: streamingMessageId,
-              role: "assistant",
-              createdAt: new Date().toISOString(),
-              content: "",
-              contentHtml: renderMarkdown(""),
-              isStreaming: true
-            };
-            state.messages = [...state.messages, streamingMessage];
-          }
-
           const nextContent = `${streamingMessage.content}${event.delta}`;
           streamingMessage = {
             ...streamingMessage,
@@ -362,9 +335,8 @@ export class CodexPanelController {
 
         if (event.type === "done") {
           if (event.assistantMessage) {
-            const finishedMessage = toPanelMessage(event.assistantMessage);
-            state.messages = replaceMessage(state.messages, finishedMessage, streamingMessageId);
-          } else if (streamingMessage) {
+            state.messages = replaceMessage(state.messages, toPanelMessage(event.assistantMessage), streamingMessageId);
+          } else {
             state.messages = replaceMessage(state.messages, {
               ...streamingMessage,
               isStreaming: false
@@ -376,7 +348,7 @@ export class CodexPanelController {
             `This month: ${formatRubles(event.billing.spentRub)} / ${formatRubles(event.billing.limitRub)}.`,
             event.billing.isLimitReached ? "warning" : "info"
           );
-          state.isBusy = true;
+          state.isBusy = false;
           state.statusMessage = this.statusMessage;
           state.statusTone = this.statusTone;
           await this.postSnapshot(state);
@@ -395,10 +367,6 @@ export class CodexPanelController {
   }
 
   private async pushSnapshot() {
-    if (!this.panel) {
-      return;
-    }
-
     const state = await buildPanelState(this.api, {
       isBusy: this.isBusy,
       statusMessage: this.statusMessage,
@@ -408,11 +376,13 @@ export class CodexPanelController {
   }
 
   private async postSnapshot(state: PanelState) {
-    if (!this.panel) {
+    this.lastState = state;
+
+    if (!this.view || !this.view.visible) {
       return;
     }
 
-    await this.panel.webview.postMessage({
+    await this.view.webview.postMessage({
       type: "snapshot",
       state
     });
@@ -781,13 +751,14 @@ function renderHtml(webview: vscode.Webview, extensionUri: vscode.Uri) {
     statusTone: "info"
   } satisfies PanelState);
   const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "assets", "webview.js"));
+  const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "assets", "webview.css"));
 
   return `<!DOCTYPE html>
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <style>${WEBVIEW_CSS}</style>
+      <link rel="stylesheet" href="${styleUri}" />
     </head>
     <body>
       <div id="app"></div>

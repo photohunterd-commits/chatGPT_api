@@ -1,23 +1,30 @@
 import * as vscode from "vscode";
 import { BackendApi } from "./backendApi.js";
-import { CodexPanelController, updateStatusBar } from "./homeView.js";
+import { CodexSidebarController, updateStatusBar } from "./homeView.js";
+
+const VIEW_CONTAINER_ID = "photohunterd.gpt54Codex";
+const VIEW_ID = "photohunterd.gpt54Codex.chat";
 
 export function activate(context: vscode.ExtensionContext) {
   const api = new BackendApi(context);
-  const panel = new CodexPanelController(context, api);
+  const sidebar = new CodexSidebarController(context, api);
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
 
   const refreshAll = async () => {
     await updateStatusBar(statusBar, api);
-    await panel.refresh();
+    await sidebar.refresh();
   };
 
   statusBar.show();
   void refreshAll();
-  void panel.autoOpenOncePerVersion();
 
   context.subscriptions.push(
     statusBar,
+    vscode.window.registerWebviewViewProvider(VIEW_ID, sidebar, {
+      webviewOptions: {
+        retainContextWhenHidden: true
+      }
+    }),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("codexBridge")) {
         void refreshAll();
@@ -30,30 +37,37 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("codexBridge.openChat", async () => {
-      await panel.open();
+      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
+      await sidebar.reveal();
       await refreshAll();
     }),
     vscode.commands.registerCommand("codexBridge.refresh", refreshAll),
     vscode.commands.registerCommand("codexBridge.newChat", async () => {
-      await panel.open();
-      await panel.startNewChat();
+      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
+      await sidebar.reveal();
+      await sidebar.startNewChat();
       await refreshAll();
     }),
     vscode.commands.registerCommand("codexBridge.sendSelection", async () => {
-      await panel.sendSelectionToChat();
+      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
+      await sidebar.reveal();
+      await sidebar.sendSelectionToChat();
       await refreshAll();
     }),
     vscode.commands.registerCommand("codexBridge.login", async () => {
-      await panel.open();
+      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
+      await sidebar.reveal();
     }),
     vscode.commands.registerCommand("codexBridge.register", async () => {
-      await panel.open();
+      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
+      await sidebar.reveal();
     }),
     vscode.commands.registerCommand("codexBridge.configureProviderKey", async () => {
-      await panel.open();
+      await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
+      await sidebar.reveal();
     }),
     vscode.commands.registerCommand("codexBridge.logout", async () => {
-      await panel.logout();
+      await sidebar.logout();
       await refreshAll();
     })
   );
