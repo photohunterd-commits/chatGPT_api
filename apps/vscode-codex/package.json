@@ -1,8 +1,8 @@
 {
   "name": "codex-project-bridge",
-  "displayName": "Codex Project Bridge",
-  "description": "A Codex-style chat sidebar for VS Code backed by your private GPT workspace server.",
-  "version": "0.5.1",
+  "displayName": "GPT54 Codex",
+  "description": "A right-side GPT54 Codex chat tab for VS Code backed by your private GPT workspace server.",
+  "version": "0.6.0",
   "publisher": "photohunterd",
   "private": true,
   "license": "MIT",
@@ -21,10 +21,10 @@
     "vscode": "^1.102.0"
   },
   "categories": [
-    "Other"
+    "AI"
   ],
   "activationEvents": [
-    "onChatParticipant:photohunterd.codexBridge.chat",
+    "onStartupFinished",
     "onCommand:codexBridge.register",
     "onCommand:codexBridge.login",
     "onCommand:codexBridge.logout",
@@ -41,69 +41,38 @@
     "package": "npm run build && vsce package --no-yarn --no-dependencies"
   },
   "contributes": {
-    "chatParticipants": [
-      {
-        "id": "photohunterd.codexBridge.chat",
-        "fullName": "GPT Workspace",
-        "name": "gpt54",
-        "description": "Private GPT workspace on your server",
-        "isSticky": true,
-        "commands": [
-          {
-            "name": "help",
-            "description": "Show setup and usage help."
-          },
-          {
-            "name": "login",
-            "description": "Sign in to your GPT Workspace account."
-          },
-          {
-            "name": "register",
-            "description": "Create a new GPT Workspace account."
-          },
-          {
-            "name": "key",
-            "description": "Save or replace your personal model API key."
-          },
-          {
-            "name": "logout",
-            "description": "Sign out from GPT Workspace."
-          }
-        ]
-      }
-    ],
     "commands": [
       {
         "command": "codexBridge.openChat",
-        "title": "Codex Bridge: Open Chat"
+        "title": "GPT54 Codex: Open Tab"
       },
       {
         "command": "codexBridge.register",
-        "title": "Codex Bridge: Register"
+        "title": "GPT54 Codex: Open Sign In"
       },
       {
         "command": "codexBridge.login",
-        "title": "Codex Bridge: Sign In"
+        "title": "GPT54 Codex: Open Sign In"
       },
       {
         "command": "codexBridge.logout",
-        "title": "Codex Bridge: Log Out"
+        "title": "GPT54 Codex: Log Out"
       },
       {
         "command": "codexBridge.configureProviderKey",
-        "title": "Codex Bridge: Configure Model API Key"
+        "title": "GPT54 Codex: Open API Key"
       },
       {
         "command": "codexBridge.refresh",
-        "title": "Codex Bridge: Refresh"
+        "title": "GPT54 Codex: Refresh"
       },
       {
         "command": "codexBridge.newChat",
-        "title": "Codex Bridge: New Chat"
+        "title": "GPT54 Codex: New Chat"
       },
       {
         "command": "codexBridge.sendSelection",
-        "title": "Codex Bridge: Send Selection to Chat"
+        "title": "GPT54 Codex: Send Selection"
       }
     ],
     "configuration": {
@@ -123,11 +92,14 @@
     }
   },
   "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
     "@types/node": "^24.8.1",
     "@types/vscode": "^1.102.0",
     "@vscode/vsce": "^3.6.1",
     "axios": "^1.12.2",
     "esbuild": "^0.25.11",
+    "highlight.js": "^11.11.1",
+    "markdown-it": "^14.1.0",
     "typescript": "^5.9.3"
   }
 }

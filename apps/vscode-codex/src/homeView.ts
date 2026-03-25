@@ -1,3 +1,5 @@
+import hljs from "highlight.js";
+import MarkdownIt from "markdown-it";
 import * as vscode from "vscode";
 import { BackendApi, setConfiguration } from "./backendApi.js";
 import {
@@ -5,94 +7,178 @@ import {
   DEFAULT_CODEX_MODEL_LABEL,
   DEFAULT_CODEX_REASONING,
   type AuthResponse,
+  type BillingSummary,
   type Chat,
   type ChatMessage,
   type ContextMode,
   type Project,
-  type SidebarState
+  type User
 } from "./types.js";
 
+const PANEL_VIEW_TYPE = "photohunterd.gpt54Codex.panel";
+const PANEL_TITLE = "GPT54 Codex";
+const AUTO_OPEN_VERSION_KEY = "codexBridge.autoOpenedVersion";
 const BRIDGE_PROJECT_NAME = "Codex";
-const BRIDGE_PROJECT_DESCRIPTION = "Internal workspace used by the VS Code Codex sidebar.";
+const BRIDGE_PROJECT_DESCRIPTION = "Internal workspace used by the VS Code GPT54 Codex chat tab.";
+
+function escapeHtmlText(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+const markdown = new MarkdownIt({
+  html: false,
+  linkify: true,
+  breaks: true,
+  highlight(code, language): string {
+    const normalizedLanguage = language.trim().toLowerCase();
+
+    try {
+      const highlighted = normalizedLanguage && hljs.getLanguage(normalizedLanguage)
+        ? hljs.highlight(code, { language: normalizedLanguage, ignoreIllegals: true }).value
+        : hljs.highlightAuto(code).value;
+      const label = escapeHtmlText(normalizedLanguage || "code");
+
+      return [
+        `<div class="code-shell">`,
+        `<div class="code-label">${label}</div>`,
+        `<pre><code class="hljs language-${label}">${highlighted}</code></pre>`,
+        `</div>`
+      ].join("");
+    } catch {
+      return [
+        `<div class="code-shell">`,
+        `<div class="code-label">${escapeHtmlText(normalizedLanguage || "code")}</div>`,
+        `<pre><code class="hljs">${escapeHtmlText(code)}</code></pre>`,
+        `</div>`
+      ].join("");
+    }
+  }
+});
+
+interface PanelMessage {
+  id: string;
+  role: string;
+  createdAt: string;
+  content: string;
+  contentHtml: string;
+  isStreaming?: boolean;
+}
+
+interface PanelState {
+  hasSession: boolean;
+  hasProviderKey: boolean;
+  user?: User;
+  billing?: BillingSummary;
+  activeChat?: Chat;
+  messages: PanelMessage[];
+  canUseEditorContext: boolean;
+  activeEditorLabel?: string;
+  isBusy: boolean;
+  statusMessage?: string;
+  statusTone?: "info" | "warning" | "error";
+}
 
 type WebviewMessage =
+  | { type: "ready" | "logout" | "refresh" | "newChat" }
   | { type: "login"; email?: string; password?: string }
   | { type: "register"; name?: string; email?: string; password?: string }
   | { type: "saveKey"; apiKey?: string }
-  | { type: "sendPrompt"; prompt?: string; contextMode?: ContextMode }
-  | { type: "newChat" | "logout" | "refresh" | "sendSelection" };
+  | { type: "sendPrompt"; prompt?: string; contextMode?: ContextMode };
 
-export class CodexChatProvider implements vscode.WebviewViewProvider {
-  private refreshHandler?: () => Promise<void>;
-  private view?: vscode.WebviewView;
+export class CodexPanelController {
+  private panel?: vscode.WebviewPanel;
+  private isBusy = false;
+  private statusMessage = "";
+  private statusTone: PanelState["statusTone"] = "info";
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly api: BackendApi
   ) {}
 
-  setRefreshHandler(handler: () => Promise<void>) {
-    this.refreshHandler = handler;
-  }
+  async open(options?: { preserveFocus?: boolean }) {
+    if (this.panel) {
+      this.panel.reveal(vscode.ViewColumn.Beside, options?.preserveFocus ?? false);
+      await this.pushSnapshot();
+      return;
+    }
 
-  async resolveWebviewView(webviewView: vscode.WebviewView) {
-    this.view = webviewView;
-    webviewView.webview.options = { enableScripts: true };
-    webviewView.webview.onDidReceiveMessage((message: WebviewMessage) => {
+    const panel = vscode.window.createWebviewPanel(
+      PANEL_VIEW_TYPE,
+      PANEL_TITLE,
+      {
+        viewColumn: vscode.ViewColumn.Beside,
+        preserveFocus: options?.preserveFocus ?? false
+      },
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "assets")]
+      }
+    );
+
+    panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, "assets", "codex-bridge.svg");
+    panel.webview.html = renderHtml(panel.webview, this.context.extensionUri);
+    panel.webview.onDidReceiveMessage((message: WebviewMessage) => {
       void this.handleMessage(message);
     }, undefined, this.context.subscriptions);
-    await this.refresh();
+    panel.onDidDispose(() => {
+      if (this.panel === panel) {
+        this.panel = undefined;
+      }
+    }, undefined, this.context.subscriptions);
+
+    this.panel = panel;
+    await this.pushSnapshot();
+  }
+
+  async autoOpenOncePerVersion() {
+    const currentVersion = String(this.context.extension.packageJSON.version ?? "");
+    const openedVersion = this.context.globalState.get<string>(AUTO_OPEN_VERSION_KEY);
+
+    if (!currentVersion || openedVersion === currentVersion) {
+      return;
+    }
+
+    await this.open({ preserveFocus: true });
+    await this.context.globalState.update(AUTO_OPEN_VERSION_KEY, currentVersion);
   }
 
   async refresh() {
-    if (!this.view) {
-      return;
-    }
-
-    try {
-      const state = await buildSidebarState(this.api);
-      this.view.webview.html = renderHtml(state);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load Codex chat.";
-      this.view.webview.html = renderErrorHtml(message);
-    }
+    await this.pushSnapshot();
   }
 
   async startNewChat() {
-    if (!(await ensureSignedIn(this.api))) {
-      return;
-    }
-
     await setConfiguration("defaultChatId", "");
-    await this.afterMutation();
+    this.setStatus("Started a fresh GPT54 Codex chat.", "info");
+    await this.pushSnapshot();
   }
 
   async logout() {
     await this.api.clearSession();
     await setConfiguration("defaultProjectId", "");
     await setConfiguration("defaultChatId", "");
-    await this.afterMutation();
+    this.setStatus("Signed out from GPT Workspace.", "info");
+    await this.pushSnapshot();
   }
 
   async sendSelectionToChat() {
-    if (!(await ensureSignedIn(this.api)) || !(await ensureProviderKey(this.api))) {
-      return;
-    }
-
-    const payload = buildPromptPayload("", "selection");
-    const chat = await ensureActiveChat(this.api, true, payload.titleSeed);
-
-    await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Window, title: "Codex is sending the current selection..." },
-      () => this.api.sendMessage(chat.id, payload.content, payload.metadata)
-    );
-
-    await this.afterMutation();
+    await this.open();
+    await this.sendPrompt("", "selection");
   }
 
   private async handleMessage(message: WebviewMessage) {
     try {
       switch (message.type) {
+        case "ready":
+        case "refresh":
+          await this.pushSnapshot();
+          return;
         case "login":
           await this.login(message.email ?? "", message.password ?? "");
           return;
@@ -108,24 +194,21 @@ export class CodexChatProvider implements vscode.WebviewViewProvider {
         case "newChat":
           await this.startNewChat();
           return;
-        case "sendSelection":
-          await this.sendSelectionToChat();
-          return;
         case "logout":
           await this.logout();
-          return;
-        case "refresh":
-          await this.afterMutation();
           return;
         default:
           return;
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unexpected Codex Bridge failure.";
-      if (isProviderNotice(message)) {
-        vscode.window.showWarningMessage(message);
+      const messageText = error instanceof Error ? error.message : "Unexpected GPT54 Codex failure.";
+      this.setStatus(messageText, isProviderNotice(messageText) ? "warning" : "error");
+      await this.pushSnapshot();
+
+      if (isProviderNotice(messageText)) {
+        vscode.window.showWarningMessage(messageText);
       } else {
-        vscode.window.showErrorMessage(message);
+        vscode.window.showErrorMessage(messageText);
       }
     }
   }
@@ -137,7 +220,8 @@ export class CodexChatProvider implements vscode.WebviewViewProvider {
 
     const auth = await this.api.login(email.trim(), password);
     await applyAuthSession(this.api, auth);
-    await this.afterMutation();
+    this.setStatus(`Signed in as ${auth.user.email}.`, "info");
+    await this.pushSnapshot();
   }
 
   private async register(name: string, email: string, password: string) {
@@ -147,7 +231,8 @@ export class CodexChatProvider implements vscode.WebviewViewProvider {
 
     const auth = await this.api.register(name.trim(), email.trim(), password);
     await applyAuthSession(this.api, auth);
-    await this.afterMutation();
+    this.setStatus(`Account created for ${auth.user.email}.`, "info");
+    await this.pushSnapshot();
   }
 
   private async saveKey(apiKey: string) {
@@ -156,94 +241,214 @@ export class CodexChatProvider implements vscode.WebviewViewProvider {
     }
 
     await this.api.storeProviderKey(apiKey.trim());
-    await this.afterMutation();
+    this.setStatus("Model API key saved locally in VS Code.", "info");
+    await this.pushSnapshot();
   }
 
   private async sendPrompt(prompt: string, contextMode: ContextMode) {
-    if (!(await ensureSignedIn(this.api)) || !(await ensureProviderKey(this.api))) {
+    if (!(await this.api.hasSession())) {
+      this.setStatus("Sign in to GPT Workspace first.", "warning");
+      await this.pushSnapshot();
+      return;
+    }
+
+    if (!(await this.api.hasProviderKey())) {
+      this.setStatus("Add your personal model API key to continue.", "warning");
+      await this.pushSnapshot();
       return;
     }
 
     const payload = buildPromptPayload(prompt, contextMode);
     const chat = await ensureActiveChat(this.api, true, payload.titleSeed);
 
-    await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Window, title: "Codex is thinking..." },
-      () => this.api.sendMessage(chat.id, payload.content, payload.metadata)
-    );
+    this.isBusy = true;
+    this.setStatus(`Streaming reply from ${DEFAULT_CODEX_MODEL_LABEL}...`, "info");
 
-    await this.afterMutation();
+    let state = await buildPanelState(this.api, {
+      isBusy: true,
+      statusMessage: this.statusMessage,
+      statusTone: this.statusTone
+    });
+
+    if (!state.activeChat || state.activeChat.id !== chat.id) {
+      state.activeChat = chat;
+      state.messages = [];
+    }
+
+    const streamingMessageId = `streaming-${Date.now()}`;
+    let streamingMessage: PanelMessage | undefined;
+    await this.postSnapshot(state);
+
+    try {
+      for await (const event of this.api.streamMessage(chat.id, payload.content, payload.metadata)) {
+        if (event.type === "start") {
+          if (event.userMessage) {
+            state.messages = [...state.messages, toPanelMessage(event.userMessage)];
+          }
+
+          streamingMessage = {
+            id: streamingMessageId,
+            role: "assistant",
+            createdAt: new Date().toISOString(),
+            content: "",
+            contentHtml: renderMarkdown(""),
+            isStreaming: true
+          };
+          state.messages = [...state.messages, streamingMessage];
+          await this.postSnapshot(state);
+          continue;
+        }
+
+        if (event.type === "delta") {
+          if (!streamingMessage) {
+            streamingMessage = {
+              id: streamingMessageId,
+              role: "assistant",
+              createdAt: new Date().toISOString(),
+              content: "",
+              contentHtml: renderMarkdown(""),
+              isStreaming: true
+            };
+            state.messages = [...state.messages, streamingMessage];
+          }
+
+          const nextContent = `${streamingMessage.content}${event.delta}`;
+          streamingMessage = {
+            ...streamingMessage,
+            content: nextContent,
+            contentHtml: renderMarkdown(nextContent),
+            isStreaming: true
+          };
+          state.messages = replaceMessage(state.messages, streamingMessage);
+          await this.postSnapshot(state);
+          continue;
+        }
+
+        if (event.type === "done") {
+          if (event.assistantMessage) {
+            const finishedMessage = toPanelMessage(event.assistantMessage);
+            state.messages = replaceMessage(state.messages, finishedMessage, streamingMessageId);
+          } else if (streamingMessage) {
+            state.messages = replaceMessage(state.messages, {
+              ...streamingMessage,
+              isStreaming: false
+            });
+          }
+
+          state.billing = event.billing;
+          this.setStatus(
+            `This month: ${formatRubles(event.billing.spentRub)} / ${formatRubles(event.billing.limitRub)}.`,
+            event.billing.isLimitReached ? "warning" : "info"
+          );
+          state.isBusy = true;
+          state.statusMessage = this.statusMessage;
+          state.statusTone = this.statusTone;
+          await this.postSnapshot(state);
+        }
+      }
+    } finally {
+      this.isBusy = false;
+    }
+
+    await this.pushSnapshot();
   }
 
-  private async afterMutation() {
-    if (this.refreshHandler) {
-      await this.refreshHandler();
+  private setStatus(message: string, tone: PanelState["statusTone"]) {
+    this.statusMessage = message;
+    this.statusTone = tone;
+  }
+
+  private async pushSnapshot() {
+    if (!this.panel) {
       return;
     }
 
-    await this.refresh();
+    const state = await buildPanelState(this.api, {
+      isBusy: this.isBusy,
+      statusMessage: this.statusMessage,
+      statusTone: this.statusTone
+    });
+    await this.postSnapshot(state);
+  }
+
+  private async postSnapshot(state: PanelState) {
+    if (!this.panel) {
+      return;
+    }
+
+    await this.panel.webview.postMessage({
+      type: "snapshot",
+      state
+    });
   }
 }
 
-export async function buildSidebarState(api: BackendApi): Promise<SidebarState> {
+export async function updateStatusBar(statusBar: vscode.StatusBarItem, api: BackendApi) {
+  statusBar.command = "codexBridge.openChat";
+
+  if (!(await api.hasSession())) {
+    statusBar.text = "$(comment-discussion) GPT54 Codex";
+    statusBar.tooltip = "Open the GPT54 Codex tab.";
+    return;
+  }
+
+  if (!(await api.hasProviderKey())) {
+    statusBar.text = "$(key) GPT54 Codex";
+    statusBar.tooltip = "Open GPT54 Codex and add your personal model API key.";
+    return;
+  }
+
+  try {
+    const session = await api.getSession();
+    statusBar.text = `$(comment-discussion) ${DEFAULT_CODEX_MODEL_LABEL} · ${formatRubles(session.billing.spentRub)}`;
+    statusBar.tooltip = `This month: ${formatRubles(session.billing.spentRub)} / ${formatRubles(session.billing.limitRub)}.`;
+  } catch {
+    statusBar.text = "$(comment-discussion) GPT54 Codex";
+    statusBar.tooltip = "Open the GPT54 Codex tab.";
+  }
+}
+
+async function buildPanelState(
+  api: BackendApi,
+  options?: {
+    isBusy?: boolean;
+    statusMessage?: string;
+    statusTone?: PanelState["statusTone"];
+  }
+): Promise<PanelState> {
   const hasSession = await api.hasSession();
   const hasProviderKey = await api.hasProviderKey();
-  const editorLabel = getEditorLabel();
-  const state: SidebarState = {
+  const baseState: PanelState = {
     hasSession,
     hasProviderKey,
     messages: [],
     canUseEditorContext: Boolean(vscode.window.activeTextEditor),
-    activeEditorLabel: editorLabel
+    activeEditorLabel: getEditorLabel(),
+    isBusy: options?.isBusy ?? false,
+    statusMessage: options?.statusMessage,
+    statusTone: options?.statusTone ?? "info"
   };
 
   if (!hasSession) {
-    return state;
+    return baseState;
   }
 
-  const session = await api.getSession();
-  const activeProject = await resolveBridgeProject(api, false);
-  const activeChat = activeProject ? await resolveActiveChat(api, activeProject, false) : undefined;
-  const messages = activeChat ? await api.listMessages(activeChat.id) : [];
+  try {
+    const session = await api.getSession();
+    const activeProject = await resolveBridgeProject(api, false);
+    const activeChat = activeProject ? await resolveActiveChat(api, activeProject, false) : undefined;
+    const messages = activeChat ? await api.listMessages(activeChat.id) : [];
 
-  return {
-    ...state,
-    user: session.user,
-    billing: session.billing,
-    activeProject,
-    activeChat,
-    messages
-  };
-}
-
-export async function updateStatusBar(statusBar: vscode.StatusBarItem, api: BackendApi) {
-  const state = await buildSidebarState(api);
-  statusBar.command = "workbench.view.extension.codexBridge";
-
-  if (!state.hasSession) {
-    statusBar.text = "$(comment-discussion) Codex";
-    statusBar.tooltip = "Open Codex and sign in.";
-    return;
+    return {
+      ...baseState,
+      user: session.user,
+      billing: session.billing,
+      activeChat,
+      messages: messages.map(toPanelMessage)
+    };
+  } catch {
+    return baseState;
   }
-
-  if (!state.hasProviderKey) {
-    statusBar.text = "$(key) Codex: add key";
-    statusBar.tooltip = "Open Codex and save your model API key.";
-    return;
-  }
-
-  if (state.billing?.isLimitReached) {
-    statusBar.text = "$(alert) Codex: limit reached";
-    statusBar.tooltip = `${formatRubles(state.billing.spentRub)} / ${formatRubles(state.billing.limitRub)}`;
-    return;
-  }
-
-  statusBar.text = `$(comment-discussion) ${DEFAULT_CODEX_MODEL_LABEL} · ${formatRubles(state.billing?.spentRub ?? 0)}`;
-  statusBar.tooltip = `Chat: ${state.activeChat?.title ?? "New chat"}`;
-}
-
-export function formatRubles(value: number) {
-  return `${value.toFixed(2)} RUB`;
 }
 
 async function applyAuthSession(api: BackendApi, auth: AuthResponse) {
@@ -256,13 +461,13 @@ async function ensureActiveChat(api: BackendApi, createIfMissing: boolean, title
   const project = await resolveBridgeProject(api, createIfMissing);
 
   if (!project) {
-    throw new Error("Unable to prepare the hidden Codex workspace.");
+    throw new Error("Unable to prepare the hidden GPT54 Codex workspace.");
   }
 
   const chat = await resolveActiveChat(api, project, createIfMissing, titleSeed);
 
   if (!chat) {
-    throw new Error("Unable to prepare the active Codex chat.");
+    throw new Error("Unable to prepare the active GPT54 Codex chat.");
   }
 
   return chat;
@@ -336,7 +541,7 @@ function buildPromptPayload(promptText: string, contextMode: ContextMode) {
   const editor = vscode.window.activeTextEditor;
 
   if (!editor) {
-    throw new Error("Open a file in the editor before attaching code context.");
+    throw new Error("Open a file in VS Code before attaching code context.");
   }
 
   const selection = editor.selection;
@@ -356,7 +561,7 @@ function buildPromptPayload(promptText: string, contextMode: ContextMode) {
     `Language: ${editor.document.languageId}`,
     usesFullFile ? "Selection: full file" : `Selection: lines ${selection.start.line + 1}-${selection.end.line + 1}`,
     "",
-    "```",
+    `\`\`\`${editor.document.languageId}`,
     selectionText,
     "```"
   ].join("\n");
@@ -377,168 +582,531 @@ function buildPromptPayload(promptText: string, contextMode: ContextMode) {
   };
 }
 
-async function ensureSignedIn(api: BackendApi) {
-  if (await api.hasSession()) {
-    return true;
-  }
-
-  vscode.window.showWarningMessage("Open the Codex panel and sign in first.");
-  return false;
+function toPanelMessage(message: ChatMessage): PanelMessage {
+  return {
+    id: message.id,
+    role: message.role,
+    createdAt: message.createdAt,
+    content: message.content,
+    contentHtml: renderMarkdown(message.content)
+  };
 }
 
-async function ensureProviderKey(api: BackendApi) {
-  if (await api.hasProviderKey()) {
-    return true;
+function replaceMessage(messages: PanelMessage[], nextMessage: PanelMessage, fallbackId?: string) {
+  const matchId = fallbackId ?? nextMessage.id;
+  const index = messages.findIndex((message) => message.id === matchId || message.id === nextMessage.id);
+
+  if (index === -1) {
+    return [...messages, nextMessage];
   }
 
-  vscode.window.showWarningMessage("Open the Codex panel and add your model API key first.");
-  return false;
+  return messages.map((message, currentIndex) => currentIndex === index ? nextMessage : message);
 }
 
-function renderHtml(state: SidebarState) {
-  const messages = state.messages.length === 0
-    ? `<section class="empty"><h2>Start a focused coding chat</h2><p>The first prompt creates a new chat automatically. Use Selection or File when you want code context from the active editor.</p></section>`
-    : state.messages.map(renderMessage).join("");
+function renderMarkdown(content: string) {
+  return markdown.render(normalizeStreamingMarkdown(content));
+}
+
+function normalizeStreamingMarkdown(content: string) {
+  const fenceMatches = content.match(/(^|\r?\n)```/gm) ?? [];
+
+  return fenceMatches.length % 2 === 1
+    ? `${content}\n\`\`\``
+    : content;
+}
+
+function renderHtml(webview: vscode.Webview, extensionUri: vscode.Uri) {
+  const initialState = serializeForWebview({
+    hasSession: false,
+    hasProviderKey: false,
+    messages: [],
+    canUseEditorContext: false,
+    isBusy: false,
+    statusTone: "info"
+  } satisfies PanelState);
+  const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "assets", "webview.js"));
 
   return `<!DOCTYPE html>
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
-      <style>
-        :root { color-scheme: dark; --bg:#0b1117; --panel:#101821; --panel2:#15212c; --line:rgba(124,145,167,.18); --text:#edf4fb; --muted:#93a9bc; --accent:#10a37f; --accentSoft:rgba(16,163,127,.16); }
-        * { box-sizing:border-box; } html,body { height:100%; } body { margin:0; font:13px/1.5 "Segoe UI",system-ui,sans-serif; color:var(--text); background:linear-gradient(180deg,#091018 0%,#0b1117 100%); }
-        .shell { min-height:100vh; display:flex; flex-direction:column; gap:12px; padding:14px; }
-        .card,.topbar,.composer,.message,.empty { border:1px solid var(--line); border-radius:18px; background:rgba(16,24,33,.96); }
-        .topbar { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:12px 14px; }
-        .brand strong { display:block; font-size:15px; } .brand span { color:var(--muted); }
-        .actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
-        button,input,textarea { font:inherit; } button { border:1px solid var(--line); background:var(--panel2); color:var(--text); border-radius:12px; padding:8px 11px; cursor:pointer; } button.primary { background:linear-gradient(135deg,#17a77f,#108868); border-color:transparent; color:#fff; } button.ghost { background:transparent; } button:disabled { opacity:.45; cursor:default; }
-        .meta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .card { padding:11px 12px; } .card strong { display:block; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; } .card span { display:block; margin-top:6px; font-size:15px; font-weight:700; }
-        .messages { flex:1; min-height:260px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; padding-right:4px; }
-        .message { padding:12px 14px; } .message.user { margin-left:18px; background:#123729; } .message.assistant { background:#15212c; }
-        .message-head { display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:12px; } .message-body { margin-top:8px; white-space:pre-wrap; word-break:break-word; }
-        .composer { padding:12px; } textarea { width:100%; min-height:116px; resize:vertical; border:1px solid var(--line); border-radius:14px; background:#0f1720; color:var(--text); padding:12px; outline:none; }
-        .composer-bar { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-top:10px; } .pills { display:flex; flex-wrap:wrap; gap:8px; } .pill.active { background:var(--accentSoft); border-color:rgba(16,163,127,.35); }
-        .hint { margin-top:10px; color:var(--muted); } .empty { padding:16px; } .empty h2 { margin:0; font-size:17px; } .empty p { margin:8px 0 0; color:var(--muted); }
-        .auth h1 { margin:14px 0 8px; font-size:23px; line-height:1.12; } .auth p { color:var(--muted); } .tabs { display:flex; gap:8px; margin:14px 0; } .panel { display:none; } .panel.active { display:block; } form { display:grid; gap:10px; } input { width:100%; border:1px solid var(--line); border-radius:12px; background:#0f1720; color:var(--text); padding:11px 12px; outline:none; }
-      </style>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <style>${WEBVIEW_CSS}</style>
     </head>
     <body>
-      <div class="shell">
-        ${!state.hasSession ? renderAuth() : !state.hasProviderKey ? renderKeySetup(state) : `
-          <header class="topbar">
-            <div class="brand"><strong>Codex</strong><span>${escapeHtml(state.user?.email ?? "")}</span></div>
-            <div class="actions">
-              <button data-command="newChat">New Chat</button>
-              <button data-command="sendSelection" ${state.canUseEditorContext ? "" : "disabled"}>Send Selection</button>
-              <button data-command="refresh">Refresh</button>
-              <button class="ghost" data-command="logout">Log Out</button>
-            </div>
-          </header>
-          <section class="meta">
-            <div class="card"><strong>Model</strong><span>${DEFAULT_CODEX_MODEL_LABEL}</span></div>
-            <div class="card"><strong>Spent</strong><span>${formatRubles(state.billing?.spentRub ?? 0)}</span></div>
-            <div class="card"><strong>Chat</strong><span>${escapeHtml(state.activeChat?.title ?? "New chat")}</span></div>
-            <div class="card"><strong>Context</strong><span>${escapeHtml(state.activeEditorLabel ?? "Open a file to attach code context")}</span></div>
-          </section>
-          <section class="messages" id="messages">${messages}</section>
-          <section class="composer">
-            <textarea id="prompt" placeholder="Describe what to build, ask a question, or continue the current thread"></textarea>
-            <div class="composer-bar">
-              <div class="pills">
-                <button class="pill active" data-context="none">Chat</button>
-                <button class="pill" data-context="selection" ${state.canUseEditorContext ? "" : "disabled"}>Selection</button>
-                <button class="pill" data-context="file" ${state.canUseEditorContext ? "" : "disabled"}>File</button>
-              </div>
-              <button id="sendPrompt" class="primary">Send</button>
-            </div>
-            <div class="hint">Press Ctrl+Enter to send. Replies use ${DEFAULT_CODEX_MODEL_LABEL} with ${DEFAULT_CODEX_REASONING} reasoning.</div>
-          </section>`}
-      </div>
+      <div id="app"></div>
       <script>
-        const vscode = acquireVsCodeApi();
-        let contextMode = "none";
-        const prompt = document.getElementById("prompt");
-        const setPanel = (name) => {
-          document.querySelectorAll("[data-tab]").forEach((button) => button.classList.toggle("primary", button.dataset.tab === name));
-          document.querySelectorAll("[data-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.panel === name));
-        };
-        document.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => setPanel(button.dataset.tab)));
-        document.querySelectorAll("[data-command]").forEach((button) => button.addEventListener("click", () => vscode.postMessage({ type: button.dataset.command })));
-        document.querySelectorAll("[data-context]").forEach((button) => button.addEventListener("click", () => { contextMode = button.dataset.context; document.querySelectorAll("[data-context]").forEach((chip) => chip.classList.toggle("active", chip === button)); }));
-        document.getElementById("loginForm")?.addEventListener("submit", (event) => { event.preventDefault(); vscode.postMessage({ type:"login", email: document.getElementById("loginEmail")?.value || "", password: document.getElementById("loginPassword")?.value || "" }); });
-        document.getElementById("registerForm")?.addEventListener("submit", (event) => { event.preventDefault(); vscode.postMessage({ type:"register", name: document.getElementById("registerName")?.value || "", email: document.getElementById("registerEmail")?.value || "", password: document.getElementById("registerPassword")?.value || "" }); });
-        document.getElementById("keyForm")?.addEventListener("submit", (event) => { event.preventDefault(); vscode.postMessage({ type:"saveKey", apiKey: document.getElementById("providerKey")?.value || "" }); });
-        const send = () => vscode.postMessage({ type:"sendPrompt", prompt: prompt?.value || "", contextMode });
-        document.getElementById("sendPrompt")?.addEventListener("click", send);
-        prompt?.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); send(); } });
-        document.getElementById("messages")?.scrollTo(0, document.getElementById("messages").scrollHeight);
-        setPanel("login");
+        window.__GPT54_INITIAL_STATE__ = ${initialState};
+        window.__GPT54_MODEL_LABEL__ = ${serializeForWebview(DEFAULT_CODEX_MODEL_LABEL)};
+        window.__GPT54_MODEL_REASONING__ = ${serializeForWebview(DEFAULT_CODEX_REASONING)};
       </script>
+      <script src="${scriptUri}"></script>
     </body>
   </html>`;
 }
 
-function renderAuth() {
-  return `<section class="card auth">
-    <h1>Talk to your code</h1>
-    <p>Sign in once, add your personal model key, and this sidebar becomes a simple coding chat.</p>
-    <div class="tabs">
-      <button class="primary" type="button" data-tab="login">Sign In</button>
-      <button type="button" data-tab="register">Create Account</button>
-    </div>
-    <div class="panel active" data-panel="login">
-      <form id="loginForm">
-        <input id="loginEmail" type="email" placeholder="Email" />
-        <input id="loginPassword" type="password" placeholder="Password" />
-        <button class="primary" type="submit">Continue</button>
-      </form>
-    </div>
-    <div class="panel" data-panel="register">
-      <form id="registerForm">
-        <input id="registerName" type="text" placeholder="Display name" />
-        <input id="registerEmail" type="email" placeholder="Email" />
-        <input id="registerPassword" type="password" placeholder="Password" />
-        <button class="primary" type="submit">Create Account</button>
-      </form>
-    </div>
-  </section>`;
+function serializeForWebview(value: unknown) {
+  return JSON.stringify(value)
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("&", "\\u0026");
 }
 
-function renderKeySetup(state: SidebarState) {
-  return `<section class="card auth">
-    <h1>${escapeHtml(state.user?.name ?? "Workspace")} is signed in</h1>
-    <p>Add your personal model API key once. The backend URL is already built in.</p>
-    <form id="keyForm" style="margin-top:14px">
-      <input id="providerKey" type="password" placeholder="Paste your model API key" />
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="primary" type="submit">Save API Key</button>
-        <button class="ghost" type="button" data-command="logout">Log Out</button>
-      </div>
-    </form>
-  </section>`;
-}
+const WEBVIEW_CSS = String.raw`
+  :root {
+    color-scheme: dark;
+    --bg: #0a0f14;
+    --panel: #101720;
+    --panel-2: #131c26;
+    --panel-3: #0c131b;
+    --line: rgba(131, 150, 168, 0.18);
+    --line-strong: rgba(47, 209, 172, 0.35);
+    --text: #eef5fb;
+    --muted: #8fa3b7;
+    --accent: #11a37f;
+    --accent-2: #14c49a;
+    --warning: #f7b955;
+    --error: #ff7f7f;
+  }
 
-function renderMessage(message: ChatMessage) {
-  const isAssistant = message.role.toLowerCase() === "assistant";
-  return `<article class="message ${isAssistant ? "assistant" : "user"}">
-    <div class="message-head"><span>${isAssistant ? "Codex" : "You"}</span><span>${escapeHtml(formatTime(message.createdAt))}</span></div>
-    <div class="message-body">${escapeHtml(message.content)}</div>
-  </article>`;
-}
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(circle at top, rgba(20, 196, 154, 0.12), transparent 28%),
+      linear-gradient(180deg, #091018 0%, var(--bg) 100%);
+    color: var(--text);
+    font: 13px/1.5 "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+  }
+
+  button, input, textarea { font: inherit; }
+  button {
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 9px 12px;
+    cursor: pointer;
+    transition: border-color .18s ease, background .18s ease, transform .18s ease;
+  }
+
+  button:hover:not(:disabled) {
+    border-color: var(--line-strong);
+    background: #182230;
+    transform: translateY(-1px);
+  }
+
+  button:disabled {
+    opacity: .45;
+    cursor: default;
+    transform: none;
+  }
+
+  button.primary {
+    background: linear-gradient(135deg, var(--accent), #11876b);
+    border-color: transparent;
+    color: white;
+  }
+
+  button.ghost { background: transparent; }
+
+  input, textarea {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel-3);
+    color: var(--text);
+    padding: 12px 14px;
+    outline: none;
+  }
+
+  textarea {
+    min-height: 120px;
+    resize: vertical;
+  }
+
+  input:focus, textarea:focus { border-color: var(--line-strong); }
+  a { color: #77d8ff; }
+
+  .shell {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .topbar,
+  .notice,
+  .auth-card,
+  .composer,
+  .message {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(16, 23, 32, 0.95);
+    backdrop-filter: blur(10px);
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .brand { min-width: 0; }
+
+  .brand-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .brand-mark {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(17,163,127,.28), rgba(20,196,154,.1));
+    border: 1px solid rgba(20,196,154,.26);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-2);
+    font-size: 16px;
+  }
+
+  .brand-subtitle {
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .topbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(19, 28, 38, 0.96);
+    padding: 8px 12px;
+    color: var(--muted);
+  }
+
+  .chip strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .notice {
+    padding: 10px 12px;
+    color: var(--text);
+  }
+
+  .notice.info { border-color: rgba(20,196,154,.25); }
+  .notice.warning { border-color: rgba(247,185,85,.28); color: #ffe0a5; }
+  .notice.error { border-color: rgba(255,127,127,.28); color: #ffc6c6; }
+
+  .conversation {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .message { padding: 14px 16px; }
+  .message.assistant { background: rgba(17, 26, 36, 0.96); }
+  .message.user { background: rgba(16, 54, 40, 0.96); }
+
+  .message-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .message-author {
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .message-body {
+    margin-top: 10px;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  .message-body > :first-child { margin-top: 0; }
+  .message-body > :last-child { margin-bottom: 0; }
+  .message-body p { margin: 0 0 12px; }
+  .message-body ul, .message-body ol { margin: 0 0 12px 18px; padding: 0; }
+  .message-body li { margin: 4px 0; }
+  .message-body h1, .message-body h2, .message-body h3 { margin: 16px 0 10px; line-height: 1.22; }
+  .message-body h1 { font-size: 20px; }
+  .message-body h2 { font-size: 17px; }
+  .message-body h3 { font-size: 15px; }
+  .message-body code {
+    font-family: Consolas, "Cascadia Code", "SFMono-Regular", monospace;
+    font-size: .93em;
+  }
+  .message-body p code,
+  .message-body li code {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 8px;
+    padding: 2px 6px;
+  }
+  .message-body blockquote {
+    margin: 0 0 12px;
+    padding: 0 0 0 14px;
+    border-left: 3px solid rgba(20,196,154,.38);
+    color: #bfd1e2;
+  }
+
+  .code-shell {
+    margin: 12px 0;
+    border: 1px solid rgba(124,145,167,.18);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #0a1016;
+  }
+
+  .code-label {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(124,145,167,.14);
+    background: rgba(19, 28, 38, 0.98);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .code-shell pre {
+    margin: 0;
+    padding: 14px;
+    overflow-x: auto;
+    background: transparent;
+  }
+
+  .composer { padding: 12px; }
+
+  .composer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .mode-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .mode-button.active {
+    background: rgba(17,163,127,.16);
+    border-color: rgba(20,196,154,.32);
+  }
+
+  .composer-hint {
+    margin-top: 10px;
+    color: var(--muted);
+  }
+
+  .auth-shell {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .auth-card {
+    width: min(560px, 100%);
+    padding: 22px;
+  }
+
+  .auth-card h1 {
+    margin: 0 0 10px;
+    font-size: 24px;
+    line-height: 1.18;
+  }
+
+  .auth-card p {
+    margin: 0;
+    color: var(--muted);
+  }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0;
+  }
+
+  .form-grid {
+    display: grid;
+    gap: 10px;
+  }
+
+  .empty {
+    padding: 20px;
+    border: 1px dashed rgba(124,145,167,.18);
+    border-radius: 18px;
+    background: rgba(16, 23, 32, 0.55);
+    color: var(--muted);
+  }
+
+  .empty strong {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text);
+    font-size: 16px;
+  }
+
+  .spinner {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .spinner span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-2);
+    display: inline-block;
+    animation: pulse 1s infinite ease-in-out;
+  }
+
+  .spinner span:nth-child(2) { animation-delay: .15s; }
+  .spinner span:nth-child(3) { animation-delay: .3s; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: .22; transform: scale(.8); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+
+  .messages::-webkit-scrollbar,
+  .code-shell pre::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .messages::-webkit-scrollbar-track,
+  .code-shell pre::-webkit-scrollbar-track {
+    background: rgba(255,255,255,.04);
+    border-radius: 999px;
+  }
+
+  .messages::-webkit-scrollbar-thumb,
+  .code-shell pre::-webkit-scrollbar-thumb {
+    background: rgba(124,145,167,.34);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .messages::-webkit-scrollbar-thumb:hover,
+  .code-shell pre::-webkit-scrollbar-thumb:hover {
+    background: rgba(124,145,167,.48);
+    background-clip: content-box;
+  }
+
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-literal,
+  .hljs-title,
+  .hljs-section,
+  .hljs-doctag,
+  .hljs-type,
+  .hljs-name,
+  .hljs-strong {
+    color: #ff7ab6;
+  }
+
+  .hljs-string,
+  .hljs-attr,
+  .hljs-symbol,
+  .hljs-bullet,
+  .hljs-addition,
+  .hljs-template-tag,
+  .hljs-template-variable {
+    color: #9ece6a;
+  }
+
+  .hljs-number,
+  .hljs-regexp,
+  .hljs-link {
+    color: #ff9e64;
+  }
+
+  .hljs-comment,
+  .hljs-quote,
+  .hljs-deletion {
+    color: #7a8ca1;
+  }
+
+  .hljs-built_in,
+  .hljs-code,
+  .hljs-title.class_,
+  .hljs-class .hljs-title {
+    color: #7dcfff;
+  }
+
+  .hljs-variable,
+  .hljs-params,
+  .hljs-property {
+    color: #c0caf5;
+  }
+
+  .hljs-function .hljs-title,
+  .hljs-title.function_ {
+    color: #7aa2f7;
+  }
+`;
 
 function deriveTitle(value: string) {
   const normalized = value.replace(/\s+/g, " ").trim();
+
   if (!normalized) {
     return "New chat";
   }
 
-  return normalized.length <= 48 ? normalized : `${normalized.slice(0, 45).trimEnd()}...`;
-}
-
-function formatTime(value: string) {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+  return normalized.length <= 48
+    ? normalized
+    : `${normalized.slice(0, 45).trimEnd()}...`;
 }
 
 function getEditorLabel() {
@@ -546,20 +1114,21 @@ function getEditorLabel() {
   return editor ? (vscode.workspace.asRelativePath(editor.document.uri, false) || editor.document.fileName) : undefined;
 }
 
-function isProviderNotice(message: string) {
-  const lowered = message.toLowerCase();
-  return lowered.includes("balance") || lowered.includes("quota") || lowered.includes("api key") || lowered.includes("provider") || lowered.includes("budget") || lowered.includes("limit");
+function formatRubles(value: number) {
+  return `${value.toFixed(2)} RUB`;
 }
 
 function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("'", "&#39;");
+  return escapeHtmlText(value);
 }
 
-function renderErrorHtml(message: string) {
-  return `<!DOCTYPE html><html lang="en"><body style="margin:0;padding:16px;background:#0b1117;color:#f5f7fa;font:13px/1.5 Segoe UI,system-ui,sans-serif"><div style="padding:18px;border-radius:18px;border:1px solid rgba(255,118,118,.25);background:rgba(31,18,24,.96)"><h1 style="margin:0 0 10px;font-size:18px">Codex chat is temporarily unavailable</h1><p style="margin:0;white-space:pre-wrap;color:#f3b9b9">${escapeHtml(message)}</p></div></body></html>`;
+function isProviderNotice(message: string) {
+  const lowered = message.toLowerCase();
+  return lowered.includes("balance")
+    || lowered.includes("quota")
+    || lowered.includes("api key")
+    || lowered.includes("provider")
+    || lowered.includes("budget")
+    || lowered.includes("limit")
+    || lowered.includes("pricing");
 }

@@ -1,29 +1,25 @@
 # GPT Workspace
 
-Private GPT workspace with:
-
-- a Windows desktop app
-- a VS Code chat participant
-- a backend that keeps chats private per user
+Private GPT workspace with a Windows app, a VS Code coding tab, and a private backend for user chats.
 
 Latest release:
 
 - https://github.com/photohunterd-commits/chatGPT_api/releases/latest
 
-## VS Code Utility Install
+## Install The VS Code Utility
 
 1. Open the latest release.
 2. Download `codex-project-bridge-<version>.vsix`.
 3. In VS Code run `Extensions: Install from VSIX...`.
 4. Select the downloaded `.vsix`.
-5. Open Chat in VS Code.
-6. Talk to `@gpt54`.
-7. On the first request, sign in or create an account and save your personal API key.
+5. Open the `GPT54 Codex` tab.
+6. Sign in or create an account in the tab.
+7. Save your personal API key in the same tab.
 
-## Windows App Install
+## Install The Windows App
 
 1. Open the latest release.
 2. Download `gpt54-workspace-setup-<version>.exe`.
 3. Install the application.
-4. Register or sign in.
-5. Add your personal model API key in Settings.
+4. Sign in or create an account.
+5. Save your personal API key in Settings.
