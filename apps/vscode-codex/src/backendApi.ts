@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import {
   DEFAULT_CODEX_MODEL,
   DEFAULT_CODEX_REASONING,
+  type ReasoningEffort,
   type AuthResponse,
   type BillingSummary,
   type Chat,
@@ -70,11 +71,11 @@ export class BackendApi {
     return response.data;
   }
 
-  async createChat(projectId: string, title: string) {
+  async createChat(projectId: string, title: string, model = DEFAULT_CODEX_MODEL, reasoningEffort: ReasoningEffort = DEFAULT_CODEX_REASONING) {
     const response = await (await this.client()).post<Chat>(`/api/projects/${projectId}/chats`, {
       title,
-      model: DEFAULT_CODEX_MODEL,
-      reasoningEffort: DEFAULT_CODEX_REASONING
+      model,
+      reasoningEffort
     });
 
     return response.data;

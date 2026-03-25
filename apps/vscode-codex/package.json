@@ -2,7 +2,7 @@
   "name": "codex-project-bridge",
   "displayName": "GPT54 Codex",
   "description": "A right-side GPT54 Codex chat tab for VS Code backed by your private GPT workspace server.",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "publisher": "photohunterd",
   "private": true,
   "license": "MIT",
@@ -87,6 +87,27 @@
           "type": "string",
           "default": "",
           "description": "Internal id of the hidden Codex project."
+        },
+        "codexBridge.defaultChatId": {
+          "type": "string",
+          "default": "",
+          "description": "Internal id of the active GPT54 Codex chat."
+        },
+        "codexBridge.selectedModel": {
+          "type": "string",
+          "default": "gpt-5.3-codex",
+          "description": "Default GPT54 Codex model for the next new chat."
+        },
+        "codexBridge.selectedReasoningEffort": {
+          "type": "string",
+          "default": "medium",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "description": "Reasoning depth for the next new GPT54 Codex chat."
         }
       }
     }

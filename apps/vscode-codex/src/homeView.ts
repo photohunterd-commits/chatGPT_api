@@ -6,12 +6,15 @@ import {
   DEFAULT_CODEX_MODEL,
   DEFAULT_CODEX_MODEL_LABEL,
   DEFAULT_CODEX_REASONING,
+  REASONING_EFFORT_OPTIONS,
   type AuthResponse,
   type BillingSummary,
   type Chat,
   type ChatMessage,
   type ContextMode,
   type Project,
+  type ReasoningEffort,
+  type SupportedModelPricing,
   type User
 } from "./types.js";
 
@@ -78,6 +81,10 @@ interface PanelState {
   messages: PanelMessage[];
   canUseEditorContext: boolean;
   activeEditorLabel?: string;
+  selectedModel: string;
+  selectedReasoningEffort: ReasoningEffort;
+  availableModels: SupportedModelPricing[];
+  availableReasoningEfforts: ReasoningEffort[];
   isBusy: boolean;
   statusMessage?: string;
   statusTone?: "info" | "warning" | "error";
@@ -88,6 +95,7 @@ type WebviewMessage =
   | { type: "login"; email?: string; password?: string }
   | { type: "register"; name?: string; email?: string; password?: string }
   | { type: "saveKey"; apiKey?: string }
+  | { type: "updatePreferences"; model?: string; reasoningEffort?: ReasoningEffort }
   | { type: "sendPrompt"; prompt?: string; contextMode?: ContextMode };
 
 export class CodexPanelController {
@@ -188,6 +196,9 @@ export class CodexPanelController {
         case "saveKey":
           await this.saveKey(message.apiKey ?? "");
           return;
+        case "updatePreferences":
+          await this.updatePreferences(message.model, message.reasoningEffort);
+          return;
         case "sendPrompt":
           await this.sendPrompt(message.prompt ?? "", message.contextMode ?? "none");
           return;
@@ -245,6 +256,19 @@ export class CodexPanelController {
     await this.pushSnapshot();
   }
 
+  private async updatePreferences(model?: string, reasoningEffort?: ReasoningEffort) {
+    if (model?.trim()) {
+      await setConfiguration("selectedModel", model.trim());
+    }
+
+    if (reasoningEffort) {
+      await setConfiguration("selectedReasoningEffort", reasoningEffort);
+    }
+
+    this.setStatus("The next chat will use the selected model and reasoning depth.", "info");
+    await this.pushSnapshot();
+  }
+
   private async sendPrompt(prompt: string, contextMode: ContextMode) {
     if (!(await this.api.hasSession())) {
       this.setStatus("Sign in to GPT Workspace first.", "warning");
@@ -258,17 +282,29 @@ export class CodexPanelController {
       return;
     }
 
-    const payload = buildPromptPayload(prompt, contextMode);
-    const chat = await ensureActiveChat(this.api, true, payload.titleSeed);
-
-    this.isBusy = true;
-    this.setStatus(`Streaming reply from ${DEFAULT_CODEX_MODEL_LABEL}...`, "info");
-
     let state = await buildPanelState(this.api, {
       isBusy: true,
       statusMessage: this.statusMessage,
       statusTone: this.statusTone
     });
+    const payload = buildPromptPayload(prompt, contextMode, state.selectedModel, state.selectedReasoningEffort);
+    const chat = await ensureActiveChat(
+      this.api,
+      true,
+      payload.titleSeed,
+      state.selectedModel,
+      state.selectedReasoningEffort,
+      state.activeChat
+    );
+
+    this.isBusy = true;
+    this.setStatus(`Streaming reply from ${resolveModelLabel(chat.model, state.availableModels)}...`, "info");
+    state = {
+      ...state,
+      isBusy: true,
+      statusMessage: this.statusMessage,
+      statusTone: this.statusTone
+    };
 
     if (!state.activeChat || state.activeChat.id !== chat.id) {
       state.activeChat = chat;
@@ -400,6 +436,7 @@ export async function updateStatusBar(statusBar: vscode.StatusBarItem, api: Back
 
   try {
     const session = await api.getSession();
+    const selectedModel = await getSelectedModel(session.billing.supportedModels);
     statusBar.text = `$(comment-discussion) ${DEFAULT_CODEX_MODEL_LABEL} · ${formatRubles(session.billing.spentRub)}`;
     statusBar.tooltip = `This month: ${formatRubles(session.billing.spentRub)} / ${formatRubles(session.billing.limitRub)}.`;
   } catch {
@@ -418,12 +455,18 @@ async function buildPanelState(
 ): Promise<PanelState> {
   const hasSession = await api.hasSession();
   const hasProviderKey = await api.hasProviderKey();
+  const selectedModel = await getSelectedModel();
+  const selectedReasoningEffort = await getSelectedReasoningEffort();
   const baseState: PanelState = {
     hasSession,
     hasProviderKey,
     messages: [],
     canUseEditorContext: Boolean(vscode.window.activeTextEditor),
     activeEditorLabel: getEditorLabel(),
+    selectedModel,
+    selectedReasoningEffort,
+    availableModels: getSelectableCodexModels(),
+    availableReasoningEfforts: [...REASONING_EFFORT_OPTIONS],
     isBusy: options?.isBusy ?? false,
     statusMessage: options?.statusMessage,
     statusTone: options?.statusTone ?? "info"
@@ -435,14 +478,20 @@ async function buildPanelState(
 
   try {
     const session = await api.getSession();
+    const availableModels = filterSelectableModels(session.billing.supportedModels);
+    const resolvedSelectedModel = await getSelectedModel(availableModels);
     const activeProject = await resolveBridgeProject(api, false);
-    const activeChat = activeProject ? await resolveActiveChat(api, activeProject, false) : undefined;
+    const activeChat = activeProject
+      ? await resolveActiveChat(api, activeProject, false, "New chat", resolvedSelectedModel, selectedReasoningEffort)
+      : undefined;
     const messages = activeChat ? await api.listMessages(activeChat.id) : [];
 
     return {
       ...baseState,
       user: session.user,
       billing: session.billing,
+      selectedModel: resolvedSelectedModel,
+      availableModels,
       activeChat,
       messages: messages.map(toPanelMessage)
     };
@@ -457,14 +506,29 @@ async function applyAuthSession(api: BackendApi, auth: AuthResponse) {
   await setConfiguration("defaultChatId", "");
 }
 
-async function ensureActiveChat(api: BackendApi, createIfMissing: boolean, titleSeed: string) {
+async function ensureActiveChat(
+  api: BackendApi,
+  createIfMissing: boolean,
+  titleSeed: string,
+  selectedModel: string,
+  selectedReasoningEffort: ReasoningEffort,
+  currentChat?: Chat
+) {
   const project = await resolveBridgeProject(api, createIfMissing);
 
   if (!project) {
     throw new Error("Unable to prepare the hidden GPT54 Codex workspace.");
   }
 
-  const chat = await resolveActiveChat(api, project, createIfMissing, titleSeed);
+  const chat = await resolveActiveChat(
+    api,
+    project,
+    createIfMissing,
+    titleSeed,
+    selectedModel,
+    selectedReasoningEffort,
+    currentChat
+  );
 
   if (!chat) {
     throw new Error("Unable to prepare the active GPT54 Codex chat.");
@@ -499,15 +563,33 @@ async function resolveActiveChat(
   api: BackendApi,
   project: Project,
   createIfMissing: boolean,
-  titleSeed = "New chat"
+  titleSeed = "New chat",
+  selectedModel = DEFAULT_CODEX_MODEL,
+  selectedReasoningEffort: ReasoningEffort = DEFAULT_CODEX_REASONING,
+  currentChat?: Chat
 ): Promise<Chat | undefined> {
   const configuration = vscode.workspace.getConfiguration("codexBridge");
   const chatId = configuration.get<string>("defaultChatId")?.trim();
   const chats = await api.listChats(project.id);
   const configured = chatId ? chats.find((chat) => chat.id === chatId) : undefined;
+  const resolvedCurrentChat = currentChat && currentChat.projectId === project.id
+    ? chats.find((chat) => chat.id === currentChat.id) ?? currentChat
+    : undefined;
+  const activeChat = configured ?? resolvedCurrentChat;
 
-  if (configured) {
-    return configured;
+  if (activeChat) {
+    const matchesSelectedModel = normalizeModel(activeChat.model) === normalizeModel(selectedModel);
+    const matchesSelectedReasoning = activeChat.reasoningEffort === selectedReasoningEffort;
+
+    if (matchesSelectedModel && matchesSelectedReasoning) {
+      return activeChat;
+    }
+
+    if (!createIfMissing) {
+      return activeChat;
+    }
+
+    await setConfiguration("defaultChatId", "");
   }
 
   if (chatId) {
@@ -518,12 +600,77 @@ async function resolveActiveChat(
     return undefined;
   }
 
-  const chat = await api.createChat(project.id, deriveTitle(titleSeed));
+  const chat = await api.createChat(project.id, deriveTitle(titleSeed), selectedModel, selectedReasoningEffort);
   await setConfiguration("defaultChatId", chat.id);
   return chat;
 }
 
-function buildPromptPayload(promptText: string, contextMode: ContextMode) {
+function getSelectableCodexModels() {
+  return filterSelectableModels([]);
+}
+
+function filterSelectableModels(models: SupportedModelPricing[]) {
+  const preferredOrder = [
+    "gpt-5.4",
+    "gpt-5.3-codex",
+    "gpt-5.2-codex",
+    "gpt-5.1-codex",
+    "gpt-5.1-codex-max",
+    "gpt-5.1-codex-mini"
+  ];
+  const modelMap = new Map(models.map((item) => [normalizeModel(item.model), item]));
+
+  if (modelMap.size === 0) {
+    return [
+      { model: "gpt-5.4", label: "GPT-5.4", inputRubPer1M: 480, cachedInputRubPer1M: 48, outputRubPer1M: 2880, webSearchRubPerCall: 1.92 },
+      { model: "gpt-5.3-codex", label: "GPT-5.3 Codex", inputRubPer1M: 336, cachedInputRubPer1M: 33.6, outputRubPer1M: 2688, webSearchRubPerCall: 1.92 },
+      { model: "gpt-5.2-codex", label: "GPT-5.2 Codex", inputRubPer1M: 336, cachedInputRubPer1M: 33.6, outputRubPer1M: 2688, webSearchRubPerCall: 1.92 },
+      { model: "gpt-5.1-codex", label: "GPT-5.1 Codex", inputRubPer1M: 240, cachedInputRubPer1M: 24, outputRubPer1M: 1920, webSearchRubPerCall: 1.92 },
+      { model: "gpt-5.1-codex-max", label: "GPT-5.1 Codex Max", inputRubPer1M: 240, cachedInputRubPer1M: 24, outputRubPer1M: 1920, webSearchRubPerCall: 1.92 },
+      { model: "gpt-5.1-codex-mini", label: "GPT-5.1 Codex mini", inputRubPer1M: 288, cachedInputRubPer1M: 28.8, outputRubPer1M: 1152, webSearchRubPerCall: 1.92 }
+    ];
+  }
+
+  return preferredOrder
+    .map((model) => modelMap.get(model))
+    .filter((item): item is SupportedModelPricing => Boolean(item));
+}
+
+async function getSelectedModel(models = getSelectableCodexModels()) {
+  const configuration = vscode.workspace.getConfiguration("codexBridge");
+  const configuredModel = configuration.get<string>("selectedModel")?.trim();
+
+  if (configuredModel && models.some((item) => normalizeModel(item.model) === normalizeModel(configuredModel))) {
+    return configuredModel;
+  }
+
+  const fallback = models.find((item) => normalizeModel(item.model) === normalizeModel(DEFAULT_CODEX_MODEL)) ?? models[0];
+  return fallback?.model ?? DEFAULT_CODEX_MODEL;
+}
+
+async function getSelectedReasoningEffort() {
+  const configuration = vscode.workspace.getConfiguration("codexBridge");
+  const configuredReasoning = configuration.get<string>("selectedReasoningEffort")?.trim().toLowerCase();
+
+  return REASONING_EFFORT_OPTIONS.find((item) => item === configuredReasoning) ?? DEFAULT_CODEX_REASONING;
+}
+
+function resolveModelLabel(model: string, supportedModels: SupportedModelPricing[]) {
+  return supportedModels.find((item) => normalizeModel(item.model) === normalizeModel(model))?.label
+    ?? filterSelectableModels(supportedModels).find((item) => normalizeModel(item.model) === normalizeModel(model))?.label
+    ?? model;
+}
+
+function normalizeModel(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function buildPromptPayload(
+  promptText: string,
+  contextMode: ContextMode,
+  selectedModel = DEFAULT_CODEX_MODEL,
+  selectedReasoningEffort: ReasoningEffort = DEFAULT_CODEX_REASONING
+) {
   const prompt = promptText.trim();
 
   if (contextMode === "none") {
@@ -533,7 +680,11 @@ function buildPromptPayload(promptText: string, contextMode: ContextMode) {
 
     return {
       content: prompt,
-      metadata: { bridgeModel: DEFAULT_CODEX_MODEL, contextMode },
+      metadata: {
+        bridgeModel: selectedModel,
+        bridgeReasoningEffort: selectedReasoningEffort,
+        contextMode
+      },
       titleSeed: prompt
     };
   }
@@ -569,7 +720,8 @@ function buildPromptPayload(promptText: string, contextMode: ContextMode) {
   return {
     content,
     metadata: {
-      bridgeModel: DEFAULT_CODEX_MODEL,
+      bridgeModel: selectedModel,
+      bridgeReasoningEffort: selectedReasoningEffort,
       contextMode,
       filePath: editor.document.uri.fsPath || editor.document.fileName,
       language: editor.document.languageId,
@@ -621,6 +773,10 @@ function renderHtml(webview: vscode.Webview, extensionUri: vscode.Uri) {
     hasProviderKey: false,
     messages: [],
     canUseEditorContext: false,
+    selectedModel: DEFAULT_CODEX_MODEL,
+    selectedReasoningEffort: DEFAULT_CODEX_REASONING,
+    availableModels: getSelectableCodexModels(),
+    availableReasoningEfforts: [...REASONING_EFFORT_OPTIONS],
     isBusy: false,
     statusTone: "info"
   } satisfies PanelState);
@@ -681,7 +837,7 @@ const WEBVIEW_CSS = String.raw`
     overflow: hidden;
   }
 
-  button, input, textarea { font: inherit; }
+  button, input, textarea, select { font: inherit; }
   button {
     border: 1px solid var(--line);
     background: var(--panel-2);
@@ -712,7 +868,7 @@ const WEBVIEW_CSS = String.raw`
 
   button.ghost { background: transparent; }
 
-  input, textarea {
+  input, textarea, select {
     width: 100%;
     border: 1px solid var(--line);
     border-radius: 14px;
@@ -727,7 +883,7 @@ const WEBVIEW_CSS = String.raw`
     resize: vertical;
   }
 
-  input:focus, textarea:focus { border-color: var(--line-strong); }
+  input:focus, textarea:focus, select:focus { border-color: var(--line-strong); }
   a { color: #77d8ff; }
 
   .shell {

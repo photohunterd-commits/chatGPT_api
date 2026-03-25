@@ -1,6 +1,6 @@
 const vscode = acquireVsCodeApi();
 let state = window.__GPT54_INITIAL_STATE__ || {};
-const MODEL_LABEL = window.__GPT54_MODEL_LABEL__ || "GPT-5 mini";
+const MODEL_LABEL = window.__GPT54_MODEL_LABEL__ || "GPT-5.3 Codex";
 const MODEL_REASONING = window.__GPT54_MODEL_REASONING__ || "medium";
 let draft = "";
 let contextMode = "none";
@@ -25,6 +25,26 @@ function formatRubles(value) {
 function formatTime(value) {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
+function resolveModelLabel(model) {
+  return state.availableModels?.find((item) => String(item.model).toLowerCase() === String(model || "").toLowerCase())?.label
+    || model
+    || MODEL_LABEL;
+}
+
+function renderModelOptions() {
+  return (state.availableModels || []).map((item) => `
+    <option value="${escapeHtml(item.model)}" ${item.model === state.selectedModel ? "selected" : ""}>
+      ${escapeHtml(item.label)} · ${formatRubles(item.inputRubPer1M)} / ${formatRubles(item.outputRubPer1M)}
+    </option>
+  `).join("");
+}
+
+function renderReasoningOptions() {
+  return (state.availableReasoningEfforts || ["low", "medium", "high", "xhigh"]).map((item) => `
+    <option value="${escapeHtml(item)}" ${item === state.selectedReasoningEffort ? "selected" : ""}>${escapeHtml(item)}</option>
+  `).join("");
 }
 
 function isNearBottom() {
@@ -134,7 +154,7 @@ function renderChat() {
       <header class="topbar">
         <div class="brand">
           <div class="brand-title">
-            <span class="brand-mark">◌</span>
+            <span class="brand-mark">◎</span>
             <span>GPT54 Codex</span>
           </div>
           <div class="brand-subtitle">${escapeHtml(state.activeChat?.title || "Fresh coding chat")} · ${escapeHtml(state.user?.email || "")}</div>
@@ -147,7 +167,7 @@ function renderChat() {
         </div>
       </header>
       <section class="chip-row">
-        <div class="chip"><strong>${escapeHtml(MODEL_LABEL)}</strong><span>${escapeHtml(MODEL_REASONING)} reasoning</span></div>
+        <div class="chip"><strong>${escapeHtml(resolveModelLabel(state.activeChat?.model || state.selectedModel))}</strong><span>${escapeHtml(state.activeChat?.reasoningEffort || state.selectedReasoningEffort || MODEL_REASONING)} reasoning</span></div>
         <div class="chip"><strong>This month</strong><span>${formatRubles(state.billing?.spentRub || 0)} / ${formatRubles(state.billing?.limitRub || 0)}</span></div>
         <div class="chip"><strong>Context</strong><span>${escapeHtml(state.activeEditorLabel || "Open a file to attach code context")}</span></div>
       </section>
@@ -155,6 +175,17 @@ function renderChat() {
       <div class="conversation">
         <section class="messages" id="messages">${renderMessages()}</section>
         <section class="composer">
+          <div class="composer-row" style="margin-top:0; margin-bottom:10px;">
+            <div class="mode-row" style="flex:1; min-width:0;">
+              <select id="modelSelect" style="min-width:240px; flex:1;">
+                ${renderModelOptions()}
+              </select>
+              <select id="reasoningSelect" style="min-width:150px;">
+                ${renderReasoningOptions()}
+              </select>
+            </div>
+            <div class="composer-hint" style="margin:0;">Changing these starts a new chat on the next send.</div>
+          </div>
           <textarea id="prompt" placeholder="Ask a coding question, describe what to build, or continue the thread"></textarea>
           <div class="composer-row">
             <div class="mode-row">
@@ -164,7 +195,7 @@ function renderChat() {
             </div>
             <button id="sendPrompt" class="primary" type="button" ${state.isBusy ? "disabled" : ""}>${state.isBusy ? "Thinking..." : "Send"}</button>
           </div>
-          <div class="composer-hint">Press Ctrl+Enter to send. Replies stream live from ${escapeHtml(MODEL_LABEL)}.</div>
+          <div class="composer-hint">Press Ctrl+Enter to send. Replies stream live from ${escapeHtml(resolveModelLabel(state.selectedModel))}.</div>
         </section>
       </div>
     </div>
@@ -217,6 +248,22 @@ function render() {
     button.addEventListener("click", () => {
       contextMode = button.getAttribute("data-context") || "none";
       render();
+    });
+  });
+
+  document.getElementById("modelSelect")?.addEventListener("change", (event) => {
+    vscode.postMessage({
+      type: "updatePreferences",
+      model: event.target.value,
+      reasoningEffort: document.getElementById("reasoningSelect")?.value || state.selectedReasoningEffort
+    });
+  });
+
+  document.getElementById("reasoningSelect")?.addEventListener("change", (event) => {
+    vscode.postMessage({
+      type: "updatePreferences",
+      model: document.getElementById("modelSelect")?.value || state.selectedModel,
+      reasoningEffort: event.target.value
     });
   });
 

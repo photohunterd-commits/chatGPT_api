@@ -36,6 +36,46 @@ const modelPricingTable: ModelPricing[] = [
     webSearchRubPerCall: 1.92
   },
   {
+    model: "gpt-5.3-codex",
+    label: "GPT-5.3 Codex",
+    inputRubPer1M: 336,
+    cachedInputRubPer1M: 33.6,
+    outputRubPer1M: 2688,
+    webSearchRubPerCall: 1.92
+  },
+  {
+    model: "gpt-5.2-codex",
+    label: "GPT-5.2 Codex",
+    inputRubPer1M: 336,
+    cachedInputRubPer1M: 33.6,
+    outputRubPer1M: 2688,
+    webSearchRubPerCall: 1.92
+  },
+  {
+    model: "gpt-5.1-codex",
+    label: "GPT-5.1 Codex",
+    inputRubPer1M: 240,
+    cachedInputRubPer1M: 24,
+    outputRubPer1M: 1920,
+    webSearchRubPerCall: 1.92
+  },
+  {
+    model: "gpt-5.1-codex-max",
+    label: "GPT-5.1 Codex Max",
+    inputRubPer1M: 240,
+    cachedInputRubPer1M: 24,
+    outputRubPer1M: 1920,
+    webSearchRubPerCall: 1.92
+  },
+  {
+    model: "gpt-5.1-codex-mini",
+    label: "GPT-5.1 Codex mini",
+    inputRubPer1M: 288,
+    cachedInputRubPer1M: 28.8,
+    outputRubPer1M: 1152,
+    webSearchRubPerCall: 1.92
+  },
+  {
     model: "gpt-5-mini",
     label: "GPT-5 mini",
     inputRubPer1M: 48,

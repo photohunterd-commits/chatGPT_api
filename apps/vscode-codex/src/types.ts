@@ -1,7 +1,18 @@
-export const DEFAULT_CODEX_MODEL = "gpt-5-mini";
-export const DEFAULT_CODEX_MODEL_LABEL = "GPT-5 mini";
+export const DEFAULT_CODEX_MODEL = "gpt-5.3-codex";
+export const DEFAULT_CODEX_MODEL_LABEL = "GPT-5.3 Codex";
 export const DEFAULT_CODEX_REASONING = "medium";
+export const REASONING_EFFORT_OPTIONS = ["low", "medium", "high", "xhigh"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORT_OPTIONS)[number];
 export type ContextMode = "none" | "selection" | "file";
+
+export interface SupportedModelPricing {
+  model: string;
+  label: string;
+  inputRubPer1M: number;
+  cachedInputRubPer1M: number;
+  outputRubPer1M: number;
+  webSearchRubPerCall: number;
+}
 
 export interface User {
   id: string;
@@ -22,6 +33,7 @@ export interface BillingSummary {
   cachedInputTokens: number;
   outputTokens: number;
   webSearchCalls: number;
+  supportedModels: SupportedModelPricing[];
 }
 
 export interface AuthResponse {
