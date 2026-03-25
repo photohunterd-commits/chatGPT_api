@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Media;
 using ChatGptApi.Desktop.Infrastructure;
 using ChatGptApi.Desktop.Models;
@@ -362,16 +363,79 @@ public sealed class MainViewModel : ObservableObject
         }
 
         var chat = await EnsureChatForMessageAsync(content);
+        var assistantMessage = default(MessageItem);
+        var draftCleared = false;
 
-        var response = await _apiClient.SendMessageAsync(CurrentSettings(), chat.Id, content);
-        DraftMessage = string.Empty;
-        ApplyBilling(response.Billing);
+        await foreach (var envelope in _apiClient.StreamMessageAsync(CurrentSettings(), chat.Id, content))
+        {
+            switch (envelope.Type)
+            {
+                case "start":
+                    if (!draftCleared)
+                    {
+                        DraftMessage = string.Empty;
+                        draftCleared = true;
+                    }
 
-        Messages.Add(new MessageItem(response.UserMessage));
-        Messages.Add(new MessageItem(response.AssistantMessage));
-        StatusMessage = response.Billing.IsLimitReached
-            ? $"Reply received. Monthly limit is now exhausted at {FormatRubles(response.Billing.SpentRub)}."
-            : $"Reply received. Spent this month: {FormatRubles(response.Billing.SpentRub)}.";
+                    if (envelope.UserMessage is not null)
+                    {
+                        Messages.Add(new MessageItem(envelope.UserMessage));
+                    }
+
+                    assistantMessage ??= MessageItem.CreateStreamingAssistant(chat.Model);
+
+                    if (!Messages.Contains(assistantMessage))
+                    {
+                        Messages.Add(assistantMessage);
+                    }
+
+                    StatusMessage = "Receiving reply...";
+                    break;
+
+                case "delta":
+                    assistantMessage ??= MessageItem.CreateStreamingAssistant(chat.Model);
+
+                    if (!Messages.Contains(assistantMessage))
+                    {
+                        if (!draftCleared)
+                        {
+                            DraftMessage = string.Empty;
+                            draftCleared = true;
+                        }
+
+                        Messages.Add(assistantMessage);
+                    }
+
+                    assistantMessage.AppendContent(envelope.Delta);
+                    StatusMessage = "Streaming reply...";
+                    break;
+
+                case "done":
+                    if (envelope.AssistantMessage is not null)
+                    {
+                        if (assistantMessage is null)
+                        {
+                            assistantMessage = new MessageItem(envelope.AssistantMessage);
+                            Messages.Add(assistantMessage);
+                        }
+                        else
+                        {
+                            assistantMessage.Complete(envelope.AssistantMessage);
+                        }
+                    }
+
+                    ApplyBilling(envelope.Billing);
+
+                    if (envelope.Billing is not null)
+                    {
+                        StatusMessage = envelope.Billing.IsLimitReached
+                            ? $"Reply received. Monthly limit is now exhausted at {FormatRubles(envelope.Billing.SpentRub)}."
+                            : $"Reply received. Spent this month: {FormatRubles(envelope.Billing.SpentRub)}.";
+                    }
+
+                    break;
+            }
+        }
     }
 
     private async Task ApplyAuthResponseAsync(AuthResponse response)
@@ -591,7 +655,7 @@ public sealed class ChatItem
     }
 }
 
-public sealed class MessageItem
+public sealed class MessageItem : ObservableObject
 {
     private static readonly Brush AssistantBackground = new SolidColorBrush(Color.FromRgb(24, 31, 41));
     private static readonly Brush AssistantBorder = new SolidColorBrush(Color.FromRgb(42, 55, 70));
@@ -599,27 +663,83 @@ public sealed class MessageItem
     private static readonly Brush UserBackground = new SolidColorBrush(Color.FromRgb(17, 75, 58));
     private static readonly Brush UserBorder = new SolidColorBrush(Color.FromRgb(29, 108, 82));
     private static readonly Brush UserForeground = new SolidColorBrush(Color.FromRgb(244, 250, 247));
+    private FlowDocument _contentDocument = new();
+    private string _content = string.Empty;
+    private string _timestamp = string.Empty;
 
     public MessageItem(MessageDto message)
     {
-        Header = string.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
-            ? "GPT-5.4"
-            : "You";
-        Content = message.Content;
+        var isAssistant = string.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase);
+        Header = isAssistant ? "GPT-5.4" : "You";
+        BubbleAlignment = isAssistant ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+        BubbleBackground = isAssistant ? AssistantBackground : UserBackground;
+        BubbleBorder = isAssistant ? AssistantBorder : UserBorder;
+        Foreground = isAssistant ? AssistantForeground : UserForeground;
+        UpdateContent(message.Content);
         Timestamp = DateTimeOffset.TryParse(message.CreatedAt, out var createdAt)
             ? createdAt.LocalDateTime.ToString("g")
             : message.CreatedAt;
-        BubbleAlignment = Header == "GPT-5.4" ? HorizontalAlignment.Left : HorizontalAlignment.Right;
-        BubbleBackground = Header == "GPT-5.4" ? AssistantBackground : UserBackground;
-        BubbleBorder = Header == "GPT-5.4" ? AssistantBorder : UserBorder;
-        Foreground = Header == "GPT-5.4" ? AssistantForeground : UserForeground;
+    }
+
+    private MessageItem(string header, string timestamp, HorizontalAlignment alignment, Brush background, Brush border, Brush foreground)
+    {
+        Header = header;
+        BubbleAlignment = alignment;
+        BubbleBackground = background;
+        BubbleBorder = border;
+        Foreground = foreground;
+        UpdateContent(string.Empty);
+        Timestamp = timestamp;
+    }
+
+    public static MessageItem CreateStreamingAssistant(string model)
+    {
+        return new MessageItem(
+            FormatAssistantHeader(model),
+            DateTime.Now.ToString("g"),
+            HorizontalAlignment.Left,
+            AssistantBackground,
+            AssistantBorder,
+            AssistantForeground);
+    }
+
+    public void AppendContent(string delta)
+    {
+        if (string.IsNullOrEmpty(delta))
+        {
+            return;
+        }
+
+        UpdateContent(_content + delta);
+    }
+
+    public void Complete(MessageDto message)
+    {
+        UpdateContent(message.Content);
+        Timestamp = DateTimeOffset.TryParse(message.CreatedAt, out var createdAt)
+            ? createdAt.LocalDateTime.ToString("g")
+            : message.CreatedAt;
     }
 
     public string Header { get; }
 
-    public string Content { get; }
+    public string Content
+    {
+        get => _content;
+        private set => SetProperty(ref _content, value);
+    }
 
-    public string Timestamp { get; }
+    public FlowDocument ContentDocument
+    {
+        get => _contentDocument;
+        private set => SetProperty(ref _contentDocument, value);
+    }
+
+    public string Timestamp
+    {
+        get => _timestamp;
+        private set => SetProperty(ref _timestamp, value);
+    }
 
     public HorizontalAlignment BubbleAlignment { get; }
 
@@ -628,4 +748,22 @@ public sealed class MessageItem
     public Brush BubbleBorder { get; }
 
     public Brush Foreground { get; }
+
+    private void UpdateContent(string value)
+    {
+        Content = value;
+        ContentDocument = MessageDocumentBuilder.Build(value, Foreground);
+    }
+
+    private static string FormatAssistantHeader(string model)
+    {
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return "GPT-5.4";
+        }
+
+        return model
+            .Trim()
+            .Replace("gpt", "GPT", StringComparison.OrdinalIgnoreCase);
+    }
 }

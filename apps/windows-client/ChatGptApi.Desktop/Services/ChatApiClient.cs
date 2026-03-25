@@ -1,8 +1,10 @@
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Runtime.CompilerServices;
 using ChatGptApi.Desktop.Models;
 
 namespace ChatGptApi.Desktop.Services;
@@ -87,6 +89,69 @@ public sealed class ChatApiClient
 
     public Task<MessageSendResponse> SendMessageAsync(ConnectionSettings settings, string chatId, string content) =>
         SendAsync<MessageSendResponse>(settings, HttpMethod.Post, $"api/chats/{chatId}/messages", new { content });
+
+    public async IAsyncEnumerable<MessageStreamEnvelope> StreamMessageAsync(
+        ConnectionSettings settings,
+        string chatId,
+        string content,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var requestUri = BuildRequestUri(settings, $"api/chats/{chatId}/messages/stream", requireAuth: true);
+        using var request = new HttpRequestMessage(HttpMethod.Post, requestUri)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(new { content, source = "desktop" }, SerializerOptions),
+                Encoding.UTF8,
+                "application/json")
+        };
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.AuthToken.Trim());
+
+        if (!string.IsNullOrWhiteSpace(settings.ProviderApiKey))
+        {
+            request.Headers.Add("X-Provider-Api-Key", settings.ProviderApiKey.Trim());
+        }
+
+        using var response = await _httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorPayload = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(ExtractError(errorPayload, response.ReasonPhrase));
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+
+        while (!reader.EndOfStream)
+        {
+            var line = await reader.ReadLineAsync().WaitAsync(cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var envelope = JsonSerializer.Deserialize<MessageStreamEnvelope>(line, SerializerOptions);
+
+            if (envelope is null)
+            {
+                continue;
+            }
+
+            if (string.Equals(envelope.Type, "error", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(envelope.Error)
+                    ? "The server reported a streaming error."
+                    : envelope.Error);
+            }
+
+            yield return envelope;
+        }
+    }
 
     private async Task<T> SendAsync<T>(
         ConnectionSettings settings,

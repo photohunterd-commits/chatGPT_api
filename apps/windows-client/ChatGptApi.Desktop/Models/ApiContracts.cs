@@ -71,6 +71,23 @@ public sealed class MessageSendResponse
     public BillingSummaryDto Billing { get; set; } = new();
 }
 
+public sealed class MessageStreamEnvelope
+{
+    public string Type { get; set; } = string.Empty;
+
+    public string Delta { get; set; } = string.Empty;
+
+    public MessageDto? UserMessage { get; set; }
+
+    public MessageDto? AssistantMessage { get; set; }
+
+    public BillingSummaryDto? Billing { get; set; }
+
+    public string Error { get; set; } = string.Empty;
+
+    public string Code { get; set; } = string.Empty;
+}
+
 public sealed class UserDto
 {
     public string Id { get; set; } = string.Empty;

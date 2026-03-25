@@ -1,4 +1,6 @@
 using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -183,7 +185,31 @@ public partial class MainWindow : Window
 
     private void OnMessagesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        if (e.OldItems is not null)
+        {
+            foreach (var item in e.OldItems.OfType<MessageItem>())
+            {
+                item.PropertyChanged -= OnMessageItemPropertyChanged;
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (var item in e.NewItems.OfType<MessageItem>())
+            {
+                item.PropertyChanged += OnMessageItemPropertyChanged;
+            }
+        }
+
         if (e.Action is NotifyCollectionChangedAction.Add or NotifyCollectionChangedAction.Reset)
+        {
+            ScrollMessagesToEnd();
+        }
+    }
+
+    private void OnMessageItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MessageItem.Content) or nameof(MessageItem.ContentDocument))
         {
             ScrollMessagesToEnd();
         }
