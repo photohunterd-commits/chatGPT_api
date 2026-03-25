@@ -15,6 +15,7 @@ namespace ChatGptApi.Desktop;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+    private bool _scrollPending;
 
     public MainWindow()
     {
@@ -217,23 +218,33 @@ public partial class MainWindow : Window
 
     private void ScrollMessagesToEnd()
     {
+        if (_scrollPending)
+        {
+            return;
+        }
+
+        _scrollPending = true;
         Dispatcher.BeginInvoke(() =>
         {
-            if (MessagesListBox.Items.Count == 0)
+            try
             {
-                return;
+                if (MessagesListBox.Items.Count == 0)
+                {
+                    return;
+                }
+
+                MessagesListBox.ScrollIntoView(MessagesListBox.Items[^1]);
+
+                if (FindDescendant<ScrollViewer>(MessagesListBox) is { } scrollViewer)
+                {
+                    scrollViewer.ScrollToEnd();
+                }
             }
-
-            MessagesListBox.UpdateLayout();
-
-            if (FindDescendant<ScrollViewer>(MessagesListBox) is { } scrollViewer)
+            finally
             {
-                scrollViewer.ScrollToEnd();
-                return;
+                _scrollPending = false;
             }
-
-            MessagesListBox.ScrollIntoView(MessagesListBox.Items[^1]);
-        }, DispatcherPriority.Loaded);
+        }, DispatcherPriority.Background);
     }
 
     private static T? FindDescendant<T>(DependencyObject root)

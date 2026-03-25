@@ -665,6 +665,7 @@ public sealed class MessageItem : ObservableObject
     private static readonly Brush UserForeground = new SolidColorBrush(Color.FromRgb(244, 250, 247));
     private FlowDocument _contentDocument = new();
     private string _content = string.Empty;
+    private bool _isStreaming;
     private string _timestamp = string.Empty;
 
     public MessageItem(MessageDto message)
@@ -675,7 +676,7 @@ public sealed class MessageItem : ObservableObject
         BubbleBackground = isAssistant ? AssistantBackground : UserBackground;
         BubbleBorder = isAssistant ? AssistantBorder : UserBorder;
         Foreground = isAssistant ? AssistantForeground : UserForeground;
-        UpdateContent(message.Content);
+        SetFinalContent(message.Content);
         Timestamp = DateTimeOffset.TryParse(message.CreatedAt, out var createdAt)
             ? createdAt.LocalDateTime.ToString("g")
             : message.CreatedAt;
@@ -688,7 +689,7 @@ public sealed class MessageItem : ObservableObject
         BubbleBackground = background;
         BubbleBorder = border;
         Foreground = foreground;
-        UpdateContent(string.Empty);
+        UpdateStreamingContent(string.Empty);
         Timestamp = timestamp;
     }
 
@@ -710,12 +711,12 @@ public sealed class MessageItem : ObservableObject
             return;
         }
 
-        UpdateContent(_content + delta);
+        UpdateStreamingContent(_content + delta);
     }
 
     public void Complete(MessageDto message)
     {
-        UpdateContent(message.Content);
+        SetFinalContent(message.Content);
         Timestamp = DateTimeOffset.TryParse(message.CreatedAt, out var createdAt)
             ? createdAt.LocalDateTime.ToString("g")
             : message.CreatedAt;
@@ -727,6 +728,12 @@ public sealed class MessageItem : ObservableObject
     {
         get => _content;
         private set => SetProperty(ref _content, value);
+    }
+
+    public bool IsStreaming
+    {
+        get => _isStreaming;
+        private set => SetProperty(ref _isStreaming, value);
     }
 
     public FlowDocument ContentDocument
@@ -749,10 +756,17 @@ public sealed class MessageItem : ObservableObject
 
     public Brush Foreground { get; }
 
-    private void UpdateContent(string value)
+    private void UpdateStreamingContent(string value)
+    {
+        IsStreaming = true;
+        Content = value;
+    }
+
+    private void SetFinalContent(string value)
     {
         Content = value;
         ContentDocument = MessageDocumentBuilder.Build(value, Foreground);
+        IsStreaming = false;
     }
 
     private static string FormatAssistantHeader(string model)

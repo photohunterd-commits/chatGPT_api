@@ -2,7 +2,7 @@
   "name": "codex-project-bridge",
   "displayName": "GPT54 Codex",
   "description": "A GPT54 Codex chat view in the VS Code secondary sidebar backed by your private GPT workspace server.",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "publisher": "photohunterd",
   "private": true,
   "license": "MIT",
